@@ -21,4 +21,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "BoardGame"
 include(":app")
- 
+include(":shared")
+include(":socket-server")

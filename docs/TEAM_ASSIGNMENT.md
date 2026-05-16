@@ -1,154 +1,160 @@
 # Team Assignment
 
-The project has three members. Each member should own a clear area and avoid editing another member's files without coordination.
+The project is split for three people by durable responsibility. The current Android debug screen is temporary test tooling, so it is shared and not owned by one member.
 
-## Member 1: Room and Firebase Room Sync
+## Member 1: Android Client Integration
 
-Primary files:
+Primary goal:
+
+- Own the production Android-side connection layer and Firebase Auth client integration.
+
+Owned files:
 
 ```text
-controller/RoomController.java
-service/RoomService.java
-storage/FirebaseRoomStorage.java
-storage/FirebaseListener.java
-model/Room.java
-model/Player.java
-util/RoomCodeGenerator.java
+app/src/main/java/com/example/boardgame/auth/FirebaseAuthTokenProvider.java
+app/src/main/java/com/example/boardgame/controller/socket/SocketRoomController.java
+app/src/main/java/com/example/boardgame/socket/BoardGameSocketClient.java
+app/src/main/java/com/example/boardgame/socket/SocketSnapshotMapper.java
+app/build.gradle.kts
 ```
 
 Responsibilities:
 
-- Nickname validation.
-- Room creation.
-- Room code generation.
-- Join room.
-- Leave room.
-- Host reassignment.
-- Ready/unready state.
-- Room status transitions.
-- Firebase room listener.
-
-Owned Firebase path:
-
-```text
-rooms/{roomCode}
-```
+- Firebase sign-in/token handoff on Android.
+- Android WebSocket connection through OkHttp.
+- UI-facing command methods in `SocketRoomController`.
+- Convert room/game socket broadcasts into client-friendly snapshots.
+- Report connection state, server messages, and errors to UI.
+- Keep Android client code from deciding authoritative game results.
 
 Definition of done:
 
-- Four players can join one room.
-- All players can ready up.
-- Room becomes `READY` only when all four players are ready.
-- Room state syncs through Firebase listener.
+- Android can connect/disconnect cleanly.
+- Android sends room/game intentions through typed controller methods.
+- Android receives and maps room/game broadcasts reliably.
+- Firebase ID token can be passed to room commands when real auth is enabled.
 
-## Member 2: Board, Turn, Tile, and Game State
+## Member 2: Socket Server, Protocol, And Room/Lobby
 
-Primary files:
+Primary goal:
+
+- Own networking, session lifecycle, command routing, auth entry points, and room/lobby flow.
+
+Owned files:
 
 ```text
-controller/GameController.java
-service/GameService.java
-service/TileService.java
-storage/FirebaseGameStorage.java
-model/GameState.java
-model/BoardTile.java
-util/Constants.java
-util/RandomUtil.java
+socket-server/src/main/java/com/example/boardgame/server/BoardGameSocketServer.java
+socket-server/src/main/java/com/example/boardgame/server/ClientSession.java
+socket-server/src/main/java/com/example/boardgame/server/GameSocketHandler.java
+socket-server/src/main/java/com/example/boardgame/server/AuthVerifier.java
+socket-server/src/main/java/com/example/boardgame/server/LanAuthVerifier.java
+socket-server/src/main/java/com/example/boardgame/server/model/Room.java
+socket-server/src/main/java/com/example/boardgame/server/service/RoomService.java
+socket-server/build.gradle.kts
+shared/src/main/java/com/example/boardgame/socket/protocol/ConnectionState.java
+shared/src/main/java/com/example/boardgame/socket/protocol/MessageTypes.java
+shared/src/main/java/com/example/boardgame/socket/protocol/SocketEventListener.java
+shared/src/main/java/com/example/boardgame/socket/protocol/SocketMessage.java
+shared/src/main/java/com/example/boardgame/socket/protocol/SnapshotCodec.java
+shared/src/main/java/com/example/boardgame/socket/protocol/RoomSnapshot.java
+shared/build.gradle.kts
 ```
 
 Responsibilities:
 
-- Start game.
+- Java-WebSocket server lifecycle.
+- Session tracking.
+- Room broadcasts.
+- Command routing in `GameSocketHandler`.
+- Room creation, joining, matchmaking, ready state, and host reassignment.
+- Request/response format.
+- Error response format.
+- Heartbeat messages.
+- Firebase Admin token verification later.
+- Keep `shared` independent from Android, Firebase, and server-only libraries.
+
+Definition of done:
+
+- Server starts with `./gradlew :socket-server:run`.
+- One to four players can connect to one room over LAN sockets.
+- Room state stays consistent when players join, ready, disconnect, or host changes.
+- Invalid commands return clear `REQUEST_ERROR` messages.
+- Protocol changes are documented and kept compatible with Android.
+
+## Member 3: Game Rules And Server State
+
+Primary goal:
+
+- Own authoritative game state and rules.
+
+Owned files:
+
+```text
+socket-server/src/main/java/com/example/boardgame/server/model/Player.java
+socket-server/src/main/java/com/example/boardgame/server/model/GameState.java
+socket-server/src/main/java/com/example/boardgame/server/model/MiniGameState.java
+socket-server/src/main/java/com/example/boardgame/server/model/MicroGameState.java
+socket-server/src/main/java/com/example/boardgame/server/service/BoardGameService.java
+socket-server/src/main/java/com/example/boardgame/server/service/MiniGameService.java
+socket-server/src/main/java/com/example/boardgame/server/service/MicroGameService.java
+socket-server/src/main/java/com/example/boardgame/server/service/ScoreService.java
+shared/src/main/java/com/example/boardgame/socket/protocol/PlayerSnapshot.java
+shared/src/main/java/com/example/boardgame/socket/protocol/GameSnapshot.java
+```
+
+Responsibilities:
+
 - Turn order.
-- Dice rolling.
+- Server-side dice rolling.
 - Player movement.
 - Tile effects.
-- Round transitions.
-- Final round handling.
-- Game state listener.
-
-Owned Firebase path:
-
-```text
-games/{roomCode}
-```
-
-Important interfaces with Member 3:
-
-- End of round sets phase to `ROUND_END`.
-- Starting the end-of-round mini game sets phase to `MINI_GAME`.
-- Landing on a `GAME` tile sets phase to `MICRO_GAME`.
-- After the micro game finishes, `continueAfterMicroGame` resumes normal turn order.
-
-Definition of done:
-
-- Player turns advance in order.
-- Player 4 ending a turn moves the game to `ROUND_END`.
-- `GAME` tile starts micro-game flow, not mini-game flow.
-- Final round ends the game.
-
-## Member 3: Mini Game, Micro Game, Score, and Ranking
-
-Primary files:
-
-```text
-controller/MiniGameController.java
-controller/MicroGameController.java
-service/MiniGameService.java
-service/MicroGameService.java
-service/ScoreService.java
-storage/FirebaseGameStorage.java
-model/MiniGameState.java
-model/MicroGameState.java
-```
-
-Responsibilities:
-
-- End-of-round mini-game state.
-- Tile-triggered micro-game state.
-- Raw score submission.
-- Score ranking.
+- Mini game and micro game state.
 - Score rewards.
-- Leaderboard.
-- Winner.
-
-Owned Firebase paths:
-
-```text
-miniGames/{roomCode}
-microGames/{roomCode}
-```
-
-Mini game scope:
-
-- Happens after every round.
-- Uses `MiniGameState`.
-- Uses `MiniGameController`.
-- Takes about 30-60 seconds.
-- Current default duration is 45 seconds.
-- Types are `COLOR_GUESSING`, `PASSWORD_GUESSING`, and `PHONE_TILT_MAZE`.
-
-Micro game scope:
-
-- Happens only from a `GAME` tile.
-- Uses `MicroGameState`.
-- Uses `MicroGameController`.
-- Takes about 10 seconds.
-- Rewards should be smaller than mini-game rewards.
+- Winner calculation later.
+- Snapshot data shape for room/game state.
 
 Definition of done:
 
-- Mini game can start, receive scores, finish, and update room scores.
-- Micro game can start, receive scores, finish, and update room scores.
-- Mini-game and micro-game code paths are not mixed.
-- Leaderboard returns players sorted by total board-game score.
+- Server rejects illegal game actions.
+- Clients cannot choose dice values, tile effects, score rewards, or winners.
+- Game rule services stay focused and readable; add new service boundaries only when the current split becomes difficult to maintain.
 
-## Shared Rules
+## Shared Temporary Test Tooling
 
-- Do not put Firebase SDK calls in services.
-- Do not trust client-provided dice rolls, random outcomes, card draws, or final score rewards.
-- Keep models Firebase-serializable with empty constructors and getters/setters.
+These files exist to manually test the socket flow and may be edited by any member after quick coordination:
+
+```text
+app/src/main/java/com/example/boardgame/MainActivity.java
+app/src/main/res/layout/activity_main.xml
+app/src/main/AndroidManifest.xml
+```
+
+Guidelines:
+
+- Keep the debug UI simple.
+- Do not build final gameplay UI assumptions into the debug screen.
+- Do not move game authority into the debug UI.
+- Keep `android:usesCleartextTraffic="true"` while LAN testing with `ws://`.
+
+## Shared Documentation And Coordination
+
+Shared docs:
+
+```text
+README.md
+docs/CODE_STRUCTURE.md
+docs/CODE_WALKTHROUGH.md
+docs/SOCKET_ARCHITECTURE.md
+docs/IMPLEMENTATION_PLAN.md
+docs/TEAM_ASSIGNMENT.md
+```
+
+Coordination rules:
+
+- Firebase is for Auth, and optionally lightweight room discovery later.
+- Do not use Firebase Realtime Database for live gameplay state.
+- Do not trust client-provided dice rolls, random outcomes, card draws, score rewards, or winners.
 - Use `MiniGame*` names only for end-of-round games.
 - Use `MicroGame*` names only for tile-triggered games.
-- Before changing a file owned by another member, agree on the change first.
-
+- Any change to `MessageTypes`, `SocketMessage`, or snapshot classes affects both Android and server.
+- Any change to command payload fields must update `docs/SOCKET_ARCHITECTURE.md` and `docs/CODE_WALKTHROUGH.md`.

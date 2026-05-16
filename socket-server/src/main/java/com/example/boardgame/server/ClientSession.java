@@ -1,0 +1,54 @@
+package com.example.boardgame.server;
+
+import com.example.boardgame.socket.protocol.MessageTypes;
+import com.example.boardgame.socket.protocol.SocketMessage;
+
+import org.java_websocket.WebSocket;
+
+import java.util.UUID;
+
+public class ClientSession {
+    private final String connectionId = UUID.randomUUID().toString();
+    private final WebSocket webSocket;
+    private volatile String roomCode = "";
+    private volatile String playerId = "";
+
+    ClientSession(WebSocket webSocket) {
+        this.webSocket = webSocket;
+    }
+
+    public void bindPlayer(String roomCode, String playerId) {
+        this.roomCode = roomCode == null ? "" : roomCode;
+        this.playerId = playerId == null ? "" : playerId;
+    }
+
+    void send(SocketMessage message) {
+        if (webSocket.isOpen()) {
+            webSocket.send(message.toWireText());
+        }
+    }
+
+    void sendError(SocketMessage request, String errorCode, String details) {
+        send(SocketMessage.builder(MessageTypes.REQUEST_ERROR)
+                .requestId(request.getRequestId())
+                .put("errorCode", errorCode)
+                .put("details", details)
+                .build());
+    }
+
+    void close() {
+        webSocket.close();
+    }
+
+    public String getConnectionId() {
+        return connectionId;
+    }
+
+    public String getRoomCode() {
+        return roomCode;
+    }
+
+    public String getPlayerId() {
+        return playerId;
+    }
+}

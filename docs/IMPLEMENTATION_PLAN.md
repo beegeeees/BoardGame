@@ -1,206 +1,123 @@
 # Implementation Plan
 
-This plan keeps the first working version small: room sync, board turns, mini games, micro games, and scoring.
+This document is a project status checklist, not a promise that every section is implemented. The code is currently a socket architecture scaffold.
 
-## Phase 1: Firebase Project Setup
+## Current State
 
-1. Create a Firebase project.
-2. Add an Android app with package name:
+Done:
 
-```text
-com.example.boardgame
-```
+- Removed Firebase Realtime Database gameplay code and dependencies.
+- Kept Firebase Auth on Android.
+- Added `shared` protocol module.
+- Added `socket-server` JVM module.
+- Added real WebSocket libraries:
+  - Android: OkHttp WebSocket.
+  - Server: Java-WebSocket.
+- Added middleground server structure:
+  - `GameSocketHandler`
+  - `RoomService`
+  - `BoardGameService`
+  - `MiniGameService`
+  - `MicroGameService`
+  - `ScoreService`
+  - `Room`, `Player`, `GameState`, `MiniGameState`, `MicroGameState`
+- Added starter commands for room and gameplay flow.
 
-3. Download `google-services.json`.
-4. Place it at:
+Not proven yet:
 
-```text
-app/google-services.json
-```
+- Multiplayer behavior has not been tested on emulator/phone.
 
-5. Sync Gradle in Android Studio. The Google Services plugin is applied automatically once the file exists.
-6. Create a Realtime Database.
-7. For early development only, use the open rules in:
-
-```text
-firebase-database-rules.dev.json
-```
-
-Production rules must be stricter after Firebase Auth or another authorization strategy is added.
-
-## Phase 2: Room Flow
-
-Goal:
-
-```text
-nickname -> create/join room -> four players ready
-```
-
-Implementation tasks:
-
-- Validate nickname.
-- Create room with generated room code.
-- Join room by code.
-- Reject joining full, in-game, or finished rooms.
-- Ready/unready players.
-- Mark room `READY` only when exactly four players are ready.
-- Write room changes to `rooms/{roomCode}`.
-- Listen for room changes.
-
-## Phase 3: Core Game Flow
+## Milestone 1: Make It Run
 
 Goal:
 
 ```text
-start game -> player turns -> tile effect -> round end
+server starts -> Android connects -> one room can be created
 ```
 
-Implementation tasks:
+Tasks:
 
-- Start game only from a `READY` room.
-- Build turn order from room players.
-- Roll dice on the server side.
-- Move the current player.
-- Apply tile effect.
-- Advance to next player.
-- Set `ROUND_END` after player 4 finishes.
-- Set `FINISHED` after the final round.
-- Write game state to `games/{roomCode}`.
+- Install a full JDK with `javac`.
+- Run `./gradlew :shared:compileJava :socket-server:compileJava :app:compileDebugJavaWithJavac`.
+- Run `./gradlew :socket-server:run`.
+- Connect to `ws://10.0.2.2:8080/game` from emulator.
 
-Important rule:
+## Milestone 2: Basic Room Flow
 
-The client should never decide dice value, random event result, card draw, score reward, or winner.
-
-## Phase 4: Tile Effects
-
-Tile behavior:
+Goal:
 
 ```text
-START
-  No effect.
-
-NORMAL
-  No effect.
-
-QUESTION_MARK
-  Server picks a random event.
-
-CARD
-  Server gives one item card.
-
-GAME
-  Starts a micro game.
+one to four clients -> one room -> ready state syncs
 ```
 
-Implementation tasks:
+Tasks:
 
-- Finalize random event list.
-- Finalize card list and effects.
-- Decide whether card effects happen immediately or are held by the player.
-- When a player lands on `GAME`, set turn phase to `MICRO_GAME`.
+- Create room.
+- Join by room code.
+- Matchmake.
+- Ready/unready.
+- Show player list.
+- Show request errors.
 
-## Phase 5: Mini Games
+## Milestone 3: Basic Turn Flow
 
-Mini games happen at the end of each round.
-
-Mini game types:
+Goal:
 
 ```text
-COLOR_GUESSING
-PASSWORD_GUESSING
-PHONE_TILT_MAZE
+host starts -> current player rolls -> server advances state
 ```
 
-Timing:
+Tasks:
+
+- Start game.
+- Show current player.
+- Roll dice.
+- Apply starter tile effect.
+- Broadcast updated game state.
+
+## Milestone 4: Auth On Server
+
+Goal:
 
 ```text
-30-60 seconds target
-45 seconds default
+server trusts Firebase UID, not client text
 ```
 
-Implementation tasks:
+Tasks:
 
-- Start mini game from `ROUND_END`.
-- Choose mini game type.
-- Save state to `miniGames/{roomCode}`.
-- Accept one raw score per player.
-- Finish after all players submit or timeout.
-- Convert raw scores into board-game score rewards.
-- Start the next round.
+- Add Firebase Admin SDK to `socket-server`.
+- Replace `LanAuthVerifier`.
+- Verify ID token before create/join/matchmake.
+- Store UID in server player/session.
+- Reject invalid tokens.
 
-Default mini game rewards:
+## Milestone 5: Real Game Rules
+
+Goal:
 
 ```text
-1st: +30
-2nd: +20
-3rd: +10
-4th: +5
+server owns the actual board game
 ```
 
-## Phase 6: Micro Games
+Tasks:
 
-Micro games happen only when a player lands on a `GAME` tile.
+- Polish tile definitions.
+- Decide final card effects.
+- Finish mini game flow.
+- Finish micro game flow.
+- Finalize scoring and winner calculation.
+- Add tests.
 
-Timing:
+Keep the current service split unless a feature clearly needs a new boundary. Avoid adding more services before the existing ones become hard to maintain.
 
-```text
-10 seconds target
-10 seconds default
-```
+## Milestone 6: Reliability And WAN
 
-Implementation tasks:
+Tasks:
 
-- Start micro game from `MICRO_GAME` phase.
-- Save state to `microGames/{roomCode}`.
-- Accept raw scores.
-- Finish after all required players submit or timeout.
-- Apply smaller score rewards.
-- Continue the interrupted turn flow with `continueAfterMicroGame`.
-
-Default micro game rewards:
-
-```text
-1st: +8
-2nd: +5
-3rd: +3
-4th: +1
-```
-
-Decision needed:
-
-```text
-Does a micro game involve only the player who landed on the tile,
-or all four players?
-```
-
-The current skeleton assumes all four can submit, because it mirrors mini-game scoring.
-
-## Phase 7: Validation and Edge Cases
-
-Add validation for:
-
-- Non-current player trying to roll.
-- Player rolling twice.
-- Applying tile effect in the wrong phase.
-- Starting mini game outside `ROUND_END`.
-- Starting micro game outside `MICRO_GAME`.
-- Duplicate score submission.
-- Player disconnect during ready, turn, mini game, or micro game.
-- Timeout handling.
-- Tie handling.
-
-## Phase 8: Tests
-
-Recommended service tests:
-
-- Room can be created.
-- Room rejects fifth player.
-- Game cannot start before four ready players.
-- Dice roll moves current player.
-- Question-mark tile changes score or position.
-- Card tile adds an item card.
-- Game tile sets phase to `MICRO_GAME`.
-- Mini game uses 45 second duration.
-- Micro game uses 10 second duration.
-- Mini game rewards are larger than micro game rewards.
-- Final winner is highest score.
+- Reconnect/resume by Firebase UID and room code.
+- Heartbeat timeout detection.
+- Room cleanup.
+- Protocol versioning.
+- `wss://` deployment.
+- ngrok test.
+- Monitoring/logging.
