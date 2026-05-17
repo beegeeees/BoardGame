@@ -12,14 +12,16 @@ public class ClientSession {
     private final WebSocket webSocket;
     private volatile String roomCode = "";
     private volatile String playerId = "";
+    private volatile String firebaseUid = "";
 
     ClientSession(WebSocket webSocket) {
         this.webSocket = webSocket;
     }
 
-    public void bindPlayer(String roomCode, String playerId) {
+    public void bindPlayer(String roomCode, String playerId, String firebaseUid) {
         this.roomCode = roomCode == null ? "" : roomCode;
         this.playerId = playerId == null ? "" : playerId;
+        this.firebaseUid = firebaseUid == null ? "" : firebaseUid;
     }
 
     void send(SocketMessage message) {
@@ -50,5 +52,9 @@ public class ClientSession {
 
     public String getPlayerId() {
         return playerId;
+    }
+
+    public String getFirebaseUid() {
+        return firebaseUid;
     }
 }

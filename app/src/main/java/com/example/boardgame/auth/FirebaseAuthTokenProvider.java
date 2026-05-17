@@ -23,10 +23,20 @@ public class FirebaseAuthTokenProvider {
     public void requireIdToken(TokenCallback callback) {
         FirebaseUser user = firebaseAuth.getCurrentUser();
         if (user == null) {
-            callback.onError(new IllegalStateException("Firebase user is not signed in"));
+            firebaseAuth.signInAnonymously()
+                    .addOnSuccessListener(result -> requestIdToken(result.getUser(), callback))
+                    .addOnFailureListener(callback::onError);
             return;
         }
 
+        requestIdToken(user, callback);
+    }
+
+    private void requestIdToken(FirebaseUser user, TokenCallback callback) {
+        if (user == null) {
+            callback.onError(new IllegalStateException("Firebase user is not signed in"));
+            return;
+        }
         user.getIdToken(false)
                 .addOnSuccessListener(result -> callback.onToken(result.getToken()))
                 .addOnFailureListener(callback::onError);

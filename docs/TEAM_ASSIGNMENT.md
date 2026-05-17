@@ -47,7 +47,7 @@ socket-server/src/main/java/com/example/boardgame/server/BoardGameSocketServer.j
 socket-server/src/main/java/com/example/boardgame/server/ClientSession.java
 socket-server/src/main/java/com/example/boardgame/server/GameSocketHandler.java
 socket-server/src/main/java/com/example/boardgame/server/AuthVerifier.java
-socket-server/src/main/java/com/example/boardgame/server/LanAuthVerifier.java
+socket-server/src/main/java/com/example/boardgame/server/FirebaseAdminAuthVerifier.java
 socket-server/src/main/java/com/example/boardgame/server/model/Room.java
 socket-server/src/main/java/com/example/boardgame/server/service/RoomService.java
 socket-server/build.gradle.kts
@@ -70,7 +70,7 @@ Responsibilities:
 - Request/response format.
 - Error response format.
 - Heartbeat messages.
-- Firebase Admin token verification later.
+- Firebase Admin token verification and one-active-room-per-UID enforcement.
 - Keep `shared` independent from Android, Firebase, and server-only libraries.
 
 Definition of done:

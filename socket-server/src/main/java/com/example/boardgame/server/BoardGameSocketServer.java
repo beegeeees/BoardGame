@@ -15,10 +15,15 @@ public class BoardGameSocketServer extends WebSocketServer {
     private static final int DEFAULT_PORT = 8080;
 
     private final Map<WebSocket, ClientSession> sessions = new ConcurrentHashMap<>();
-    private final GameSocketHandler gameSocketHandler = new GameSocketHandler(this, new LanAuthVerifier());
+    private final GameSocketHandler gameSocketHandler;
 
     public BoardGameSocketServer(int port) {
+        this(port, new FirebaseAdminAuthVerifier());
+    }
+
+    BoardGameSocketServer(int port, AuthVerifier authVerifier) {
         super(new InetSocketAddress(port));
+        gameSocketHandler = new GameSocketHandler(this, authVerifier);
     }
 
     public static void main(String[] args) {

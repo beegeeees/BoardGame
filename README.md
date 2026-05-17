@@ -12,14 +12,15 @@ Done:
 
 - `app`: Android debug UI with Firebase Auth helper and OkHttp WebSocket client.
 - `shared`: dependency-free socket protocol DTOs shared by app/server.
-- `socket-server`: LAN JVM server using Java-WebSocket for room creation, joining, matchmaking, ready state, start game, dice rolls, starter tile effects, and starter mini/micro score flows.
+- `socket-server`: JVM server using Java-WebSocket and Firebase Admin auth for room creation, joining, matchmaking, ready state, start game, dice rolls, starter tile effects, and starter mini/micro score flows.
 - Balanced server layout: `GameSocketHandler`, `RoomService`, `BoardGameService`, `MiniGameService`, `MicroGameService`, `ScoreService`, and minimal models.
 - Removed old Firebase Realtime Database gameplay code and dependencies.
 - Added request IDs, basic errors, room/game broadcasts, and heartbeat messages.
+- Prevented one verified Firebase UID from joining multiple active rooms at the same time.
 
 Still needed:
 
-- Server-side Firebase ID token verification.
+- Manual Firebase service-account and device verification.
 - Reconnect/resume support.
 - Polished board-game rules on the server.
 - Final tile effects, mini games, micro games, scoring, and winner calculation.
@@ -80,6 +81,14 @@ Example file:
 ```text
 app/google-services.json.example
 ```
+
+The socket server verifies client ID tokens with Firebase Admin. Set one of these before running the server:
+
+```bash
+export FIREBASE_SERVICE_ACCOUNT=/absolute/path/to/service-account.json
+```
+
+or configure `GOOGLE_APPLICATION_CREDENTIALS`.
 
 ## Docs
 

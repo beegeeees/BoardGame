@@ -10,6 +10,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.example.boardgame.auth.FirebaseAuthTokenProvider;
 import com.example.boardgame.controller.socket.SocketRoomController;
 import com.example.boardgame.socket.SocketSnapshotMapper;
 import com.example.boardgame.socket.protocol.ConnectionState;
@@ -19,9 +20,12 @@ import com.example.boardgame.socket.protocol.PlayerSnapshot;
 import com.example.boardgame.socket.protocol.RoomSnapshot;
 import com.example.boardgame.socket.protocol.SocketEventListener;
 import com.example.boardgame.socket.protocol.SocketMessage;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.auth.FirebaseAuthException;
 
 public class MainActivity extends AppCompatActivity {
     private final SocketRoomController socketController = new SocketRoomController();
+    private FirebaseAuthTokenProvider authTokenProvider;
 
     private EditText serverUrlInput;
     private EditText nicknameInput;
@@ -48,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         bindViews();
+        initializeFirebase();
         bindSocket();
         bindButtons();
     }
@@ -68,6 +73,21 @@ public class MainActivity extends AppCompatActivity {
         roomStateText = findViewById(R.id.roomStateText);
         gameStateText = findViewById(R.id.gameStateText);
         eventLogText = findViewById(R.id.eventLogText);
+    }
+
+    private void initializeFirebase() {
+        try {
+            if (FirebaseApp.getApps(this).isEmpty()) {
+                FirebaseApp.initializeApp(this);
+            }
+            if (!FirebaseApp.getApps(this).isEmpty()) {
+                authTokenProvider = new FirebaseAuthTokenProvider();
+            } else {
+                appendLog("Auth error: missing app/google-services.json");
+            }
+        } catch (IllegalStateException e) {
+            appendLog("Auth error: " + e.getMessage());
+        }
     }
 
     private void bindSocket() {
@@ -95,11 +115,11 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.disconnectButton).setOnClickListener(v ->
                 socketController.disconnect());
         findViewById(R.id.createRoomButton).setOnClickListener(v ->
-                socketController.createRoom(nickname(), ""));
+                withIdToken(token -> socketController.createRoom(nickname(), token)));
         findViewById(R.id.joinRoomButton).setOnClickListener(v ->
-                socketController.joinRoom(textOf(roomCodeInput), nickname(), ""));
+                withIdToken(token -> socketController.joinRoom(textOf(roomCodeInput), nickname(), token)));
         findViewById(R.id.matchmakeButton).setOnClickListener(v ->
-                socketController.matchmake(nickname(), ""));
+                withIdToken(token -> socketController.matchmake(nickname(), token)));
         findViewById(R.id.readyButton).setOnClickListener(v ->
                 socketController.setReady(true));
         findViewById(R.id.unreadyButton).setOnClickListener(v ->
@@ -190,6 +210,38 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void withIdToken(TokenAction action) {
+        if (authTokenProvider == null) {
+            appendLog("Auth error: Firebase is not initialized. Add app/google-services.json.");
+            return;
+        }
+        authTokenProvider.requireIdToken(new FirebaseAuthTokenProvider.TokenCallback() {
+            @Override
+            public void onToken(String idToken) {
+                action.run(idToken);
+            }
+
+            @Override
+            public void onError(Exception exception) {
+                runOnUiThread(() -> appendLog("Auth error: " + authErrorMessage(exception)));
+            }
+        });
+    }
+
+    private String authErrorMessage(Exception exception) {
+        String message = exception.getMessage() == null ? "" : exception.getMessage();
+        if (message.contains("CONFIGURATION_NOT_FOUND")) {
+            return "Firebase Authentication is not configured. Enable Authentication and Anonymous sign-in in Firebase Console.";
+        }
+        if (exception instanceof FirebaseAuthException) {
+            FirebaseAuthException authException = (FirebaseAuthException) exception;
+            if ("ERROR_OPERATION_NOT_ALLOWED".equals(authException.getErrorCode())) {
+                return "Anonymous sign-in is disabled. Enable it in Firebase Console > Authentication > Sign-in method.";
+            }
+        }
+        return message.isEmpty() ? exception.getClass().getSimpleName() : message;
+    }
+
     private String textOf(EditText editText) {
         return editText.getText().toString().trim();
     }
@@ -199,5 +251,9 @@ public class MainActivity extends AppCompatActivity {
             return "-";
         }
         return id.length() <= 6 ? id : id.substring(0, 6);
+    }
+
+    private interface TokenAction {
+        void run(String idToken);
     }
 }

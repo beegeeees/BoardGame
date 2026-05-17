@@ -398,17 +398,19 @@ Fields:
 - `webSocket`: Java-WebSocket connection object.
 - `roomCode`: room currently joined.
 - `playerId`: player ID currently bound.
+- `firebaseUid`: verified Firebase UID currently bound.
 
 Methods:
 
 - `ClientSession(WebSocket)`: wraps one WebSocket.
-- `bindPlayer(String, String)`: associates the connection with a room/player.
+- `bindPlayer(String, String, String)`: associates the connection with a room/player/UID.
 - `send(SocketMessage)`: sends one message to the client.
 - `sendError(SocketMessage, String, String)`: sends `REQUEST_ERROR`.
 - `close()`: closes the WebSocket.
 - `getConnectionId()`: returns connection ID.
 - `getRoomCode()`: returns bound room code.
 - `getPlayerId()`: returns bound player ID.
+- `getFirebaseUid()`: returns bound Firebase UID.
 
 ### `socket-server/src/main/java/com/example/boardgame/server/GameSocketHandler.java`
 
@@ -461,22 +463,23 @@ Inner class `Result`:
 Purpose:
 
 - Interface for validating a user identity.
-- LAN mode uses a simple implementation; production should verify Firebase ID tokens.
+- Implementations return the trusted UID after token verification.
 
 Methods:
 
 - `verify(String, String)`: returns trusted user ID for a token/connection.
 
-### `socket-server/src/main/java/com/example/boardgame/server/LanAuthVerifier.java`
+### `socket-server/src/main/java/com/example/boardgame/server/FirebaseAdminAuthVerifier.java`
 
 Purpose:
 
-- Temporary LAN identity provider.
-- Does not verify Firebase tokens.
+- Verifies Firebase ID tokens with Firebase Admin SDK.
+- Checks token revocation and returns the verified Firebase UID.
+- Loads credentials from `FIREBASE_SERVICE_ACCOUNT` or `GOOGLE_APPLICATION_CREDENTIALS`.
 
 Methods:
 
-- `verify(String, String)`: returns `lan-` plus the connection ID.
+- `verify(String, String)`: returns the verified Firebase UID.
 
 ## Server Model Files
 

@@ -35,14 +35,16 @@ public class RoomService {
     private final Map<String, Room> rooms = new ConcurrentHashMap<>();
     private final SecureRandom random = new SecureRandom();
 
-    public Room createRoom(String firebaseUid, String nickname) {
+    public synchronized Room createRoom(String firebaseUid, String nickname) {
+        requireUidAvailable(firebaseUid);
         Room room = new Room(createUniqueRoomCode());
         room.addPlayer(createPlayer(firebaseUid, nickname));
         rooms.put(room.getCode(), room);
         return room;
     }
 
-    public Player joinRoom(String roomCode, String firebaseUid, String nickname) {
+    public synchronized Player joinRoom(String roomCode, String firebaseUid, String nickname) {
+        requireUidAvailable(firebaseUid);
         Room room = requireRoom(roomCode);
         if (!Room.WAITING.equals(room.getStatus()) && !Room.READY.equals(room.getStatus())) {
             throw new IllegalStateException("Room is already in game");
@@ -57,7 +59,7 @@ public class RoomService {
         return player;
     }
 
-    public MatchResult matchmake(String firebaseUid, String nickname) {
+    public synchronized MatchResult matchmake(String firebaseUid, String nickname) {
         for (Room room : rooms.values()) {
             if ((Room.WAITING.equals(room.getStatus()) || Room.READY.equals(room.getStatus()))
                     && room.getPlayers().size() < MAX_PLAYERS) {
@@ -71,14 +73,14 @@ public class RoomService {
         return new MatchResult(room, player);
     }
 
-    public void setReady(String roomCode, String playerId, boolean ready) {
+    public synchronized void setReady(String roomCode, String playerId, boolean ready) {
         Room room = requireRoom(roomCode);
         Player player = requirePlayer(room, playerId);
         player.setReady(ready);
         room.refreshReadyStatus(MIN_PLAYERS);
     }
 
-    public void disconnect(String roomCode, String playerId) {
+    public synchronized void disconnect(String roomCode, String playerId) {
         Room room = rooms.get(roomCode);
         if (room == null) {
             return;
@@ -119,6 +121,20 @@ public class RoomService {
 
     private Player createPlayer(String firebaseUid, String nickname) {
         return new Player(UUID.randomUUID().toString(), firebaseUid, nickname);
+    }
+
+    private void requireUidAvailable(String firebaseUid) {
+        if (firebaseUid == null || firebaseUid.trim().isEmpty()) {
+            throw new IllegalArgumentException("Firebase UID is required");
+        }
+
+        for (Room room : rooms.values()) {
+            for (Player player : room.getPlayerList()) {
+                if (firebaseUid.equals(player.getFirebaseUid())) {
+                    throw new IllegalStateException("User is already in a room");
+                }
+            }
+        }
     }
 
     private String createUniqueRoomCode() {

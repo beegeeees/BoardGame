@@ -16,9 +16,7 @@ Firebase Auth        Android client                  Socket server
                           | room/game broadcasts          |
 ```
 
-Firebase Auth identifies the user. The socket server owns live lobby, room, and gameplay state.
-
-For the current LAN scaffold, server token verification is not implemented yet. `LanAuthVerifier` assigns a temporary LAN identity. Replace it with Firebase Admin SDK verification before WAN testing.
+Firebase Auth identifies the user. The socket server owns live lobby, room, and gameplay state. The server verifies Firebase ID tokens with the Firebase Admin SDK and stores the verified UID; it does not trust UID-like client fields.
 
 ## Current Protocol
 
@@ -66,6 +64,8 @@ APP_PONG
 
 `REQUEST_OK` and `REQUEST_ERROR` answer a specific command. `ROOM_UPDATED` and `GAME_UPDATED` are broadcasts and can arrive at any time.
 
+Missing, invalid, expired, or revoked Firebase ID tokens are rejected with `REQUEST_ERROR errorCode=UNAUTHENTICATED`. A verified UID may only be seated in one active room at a time.
+
 ## Current Server Behavior
 
 Implemented:
@@ -85,14 +85,21 @@ Implemented:
 - Broadcast room and game snapshots.
 - Remove players on disconnect.
 - Reassign host when the host disconnects.
+- Verify Firebase ID tokens for room entry commands.
+- Reject duplicate active room seats for the same verified UID.
 
 Missing:
 
-- Firebase Admin SDK token verification.
 - Reconnect/resume.
 - Room timeout cleanup.
-- Polished tile effects, mini games, micro games, scoring, and winner calculation.
+- Stable protocol errors.
+- Protocol versioning and compatibility.
+- Dedicated mini-game and micro-game broadcasts.
+- Final tile effects, mini games, micro games, scoring, and winner calculation.
+- Persistence and observability decisions.
 - TLS/WAN deployment.
+
+See `docs/IMPLEMENTATION_PLAN.md` for the detailed implementation checklist.
 
 ## LAN Testing
 
@@ -132,7 +139,7 @@ Gameplay state should still remain on the socket server.
 
 Before real WAN multiplayer:
 
-- Verify Firebase ID tokens on the server.
+- Manually verify Firebase Admin credentials and signed-in clients.
 - Use `wss://`.
 - Add reconnect and session resume.
 - Add heartbeat timeout detection.

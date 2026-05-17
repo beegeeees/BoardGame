@@ -9,7 +9,10 @@ java {
 
 dependencies {
     implementation(project(":shared"))
+    implementation(libs.firebase.admin)
     implementation(libs.java.websocket)
+
+    testImplementation(libs.junit)
 }
 
 application {

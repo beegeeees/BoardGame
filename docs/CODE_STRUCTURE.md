@@ -93,7 +93,7 @@ socket-server/src/main/java/com/example/boardgame/server/BoardGameSocketServer.j
 socket-server/src/main/java/com/example/boardgame/server/ClientSession.java
 socket-server/src/main/java/com/example/boardgame/server/GameSocketHandler.java
 socket-server/src/main/java/com/example/boardgame/server/AuthVerifier.java
-socket-server/src/main/java/com/example/boardgame/server/LanAuthVerifier.java
+socket-server/src/main/java/com/example/boardgame/server/FirebaseAdminAuthVerifier.java
 ```
 
 Server package layout:

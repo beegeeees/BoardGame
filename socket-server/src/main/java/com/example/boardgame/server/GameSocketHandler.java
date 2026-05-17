@@ -36,6 +36,8 @@ public class GameSocketHandler {
             if (result.publishGame) {
                 publishGame(result.room);
             }
+        } catch (AuthException e) {
+            session.sendError(message, "UNAUTHENTICATED", "Authentication required");
         } catch (IllegalArgumentException | IllegalStateException e) {
             session.sendError(message, "BAD_REQUEST", e.getMessage());
         }
@@ -89,28 +91,31 @@ public class GameSocketHandler {
 
     private Result createRoom(ClientSession session, SocketMessage message) {
         requireNotInRoom(session);
-        Room room = roomService.createRoom(verify(message, session), message.getOrDefault("nickname", "Player"));
+        String firebaseUid = verify(message, session);
+        Room room = roomService.createRoom(firebaseUid, message.getOrDefault("nickname", "Player"));
         Player player = room.getPlayerList().iterator().next();
-        session.bindPlayer(room.getCode(), player.getId());
+        session.bindPlayer(room.getCode(), player.getId(), firebaseUid);
         return Result.roomOnly(room, player);
     }
 
     private Result joinRoom(ClientSession session, SocketMessage message) {
         requireNotInRoom(session);
         String roomCode = message.getOrDefault("roomCode", "");
-        Player player = roomService.joinRoom(roomCode, verify(message, session), message.getOrDefault("nickname", "Player"));
+        String firebaseUid = verify(message, session);
+        Player player = roomService.joinRoom(roomCode, firebaseUid, message.getOrDefault("nickname", "Player"));
         Room room = roomService.requireRoom(roomCode);
-        session.bindPlayer(room.getCode(), player.getId());
+        session.bindPlayer(room.getCode(), player.getId(), firebaseUid);
         return Result.roomOnly(room, player);
     }
 
     private Result matchmake(ClientSession session, SocketMessage message) {
         requireNotInRoom(session);
+        String firebaseUid = verify(message, session);
         RoomService.MatchResult matchResult = roomService.matchmake(
-                verify(message, session),
+                firebaseUid,
                 message.getOrDefault("nickname", "Player")
         );
-        session.bindPlayer(matchResult.getRoom().getCode(), matchResult.getPlayer().getId());
+        session.bindPlayer(matchResult.getRoom().getCode(), matchResult.getPlayer().getId(), firebaseUid);
         return Result.roomOnly(matchResult.getRoom(), matchResult.getPlayer());
     }
 

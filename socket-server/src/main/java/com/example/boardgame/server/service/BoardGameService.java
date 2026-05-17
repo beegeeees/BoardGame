@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BoardGameService {
-    public static final int BOARD_SIZE = 24;
-    public static final int FINAL_ROUND = 5;
+    public static final int BOARD_SIZE = 16;
+    public static final int FINAL_ROUND = 3;
 
     public static final String TILE_START = "START";
     public static final String TILE_NORMAL = "NORMAL";
