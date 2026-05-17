@@ -14,7 +14,6 @@ Owned files:
 app/src/main/java/com/example/boardgame/auth/FirebaseAuthTokenProvider.java
 app/src/main/java/com/example/boardgame/controller/socket/SocketRoomController.java
 app/src/main/java/com/example/boardgame/socket/BoardGameSocketClient.java
-app/src/main/java/com/example/boardgame/socket/SocketSnapshotMapper.java
 app/build.gradle.kts
 ```
 
@@ -55,7 +54,7 @@ shared/src/main/java/com/example/boardgame/socket/protocol/ConnectionState.java
 shared/src/main/java/com/example/boardgame/socket/protocol/MessageTypes.java
 shared/src/main/java/com/example/boardgame/socket/protocol/SocketEventListener.java
 shared/src/main/java/com/example/boardgame/socket/protocol/SocketMessage.java
-shared/src/main/java/com/example/boardgame/socket/protocol/SnapshotCodec.java
+shared/src/main/java/com/example/boardgame/socket/protocol/SnapshotMessageMapper.java
 shared/src/main/java/com/example/boardgame/socket/protocol/RoomSnapshot.java
 shared/build.gradle.kts
 ```

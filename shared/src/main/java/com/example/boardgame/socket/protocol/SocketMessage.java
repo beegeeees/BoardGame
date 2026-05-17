@@ -1,29 +1,32 @@
 package com.example.boardgame.socket.protocol;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonParser;
+
 import java.util.UUID;
 
 public class SocketMessage {
     public static final String FIELD_TYPE = "type";
     public static final String FIELD_REQUEST_ID = "requestId";
+    public static final String FIELD_FIELDS = "fields";
+
+    private static final Gson GSON = new Gson();
 
     private final String type;
     private final String requestId;
-    private final Map<String, String> fields;
+    private final JsonObject fields;
 
-    private SocketMessage(String type, String requestId, Map<String, String> fields) {
+    private SocketMessage(String type, String requestId, JsonObject fields) {
         if (type == null || type.trim().isEmpty()) {
             throw new IllegalArgumentException("Message type is required");
         }
         this.type = type;
         this.requestId = requestId == null ? "" : requestId;
-        this.fields = new LinkedHashMap<>(fields);
+        this.fields = copyObject(fields);
     }
 
     public static SocketMessage command(String type) {
@@ -37,45 +40,20 @@ public class SocketMessage {
     }
 
     public static SocketMessage parse(String wireText) {
-        Map<String, String> fields = new LinkedHashMap<>();
-        if (wireText != null && !wireText.isEmpty()) {
-            String[] pairs = wireText.split("&");
-            for (String pair : pairs) {
-                int separator = pair.indexOf('=');
-                if (separator <= 0) {
-                    continue;
-                }
-                String key = decode(pair.substring(0, separator));
-                String value = decode(pair.substring(separator + 1));
-                fields.put(key, value);
-            }
-        }
-
-        String type = fields.remove(FIELD_TYPE);
-        String requestId = fields.remove(FIELD_REQUEST_ID);
-        return new SocketMessage(type, requestId, fields);
+        JsonObject root = JsonParser.parseString(wireText).getAsJsonObject();
+        String type = valueAsString(root.get(FIELD_TYPE));
+        String requestId = valueAsString(root.get(FIELD_REQUEST_ID));
+        return new SocketMessage(type, requestId, objectOrEmpty(root.get(FIELD_FIELDS)));
     }
 
     public String toWireText() {
-        Map<String, String> orderedFields = new LinkedHashMap<>();
-        orderedFields.put(FIELD_TYPE, type);
-        orderedFields.put(FIELD_REQUEST_ID, requestId);
-        for (Map.Entry<String, String> entry : fields.entrySet()) {
-            if (!FIELD_TYPE.equals(entry.getKey()) && !FIELD_REQUEST_ID.equals(entry.getKey())) {
-                orderedFields.put(entry.getKey(), entry.getValue());
-            }
-        }
+        JsonObject root = new JsonObject();
+        root.addProperty(FIELD_TYPE, type);
+        root.addProperty(FIELD_REQUEST_ID, requestId);
 
-        StringBuilder builder = new StringBuilder();
-        for (Map.Entry<String, String> entry : orderedFields.entrySet()) {
-            if (builder.length() > 0) {
-                builder.append('&');
-            }
-            builder.append(encode(entry.getKey()));
-            builder.append('=');
-            builder.append(encode(entry.getValue()));
-        }
-        return builder.toString();
+        root.add(FIELD_FIELDS, fields.deepCopy());
+
+        return GSON.toJson(root);
     }
 
     public String getType() {
@@ -87,54 +65,82 @@ public class SocketMessage {
     }
 
     public String get(String key) {
-        return fields.get(key);
+        JsonElement value = fields.get(key);
+        return value == null ? null : valueAsString(value);
     }
 
     public String getOrDefault(String key, String defaultValue) {
-        String value = fields.get(key);
-        return value == null ? defaultValue : value;
+        JsonElement value = fields.get(key);
+        return value == null || value.isJsonNull() ? defaultValue : valueAsString(value);
     }
 
     public int getInt(String key, int defaultValue) {
-        String value = fields.get(key);
-        if (value == null || value.isEmpty()) {
+        JsonElement value = fields.get(key);
+        if (value == null || value.isJsonNull()) {
             return defaultValue;
         }
-        return Integer.parseInt(value);
+        return value.getAsInt();
     }
 
     public boolean getBoolean(String key, boolean defaultValue) {
-        String value = fields.get(key);
-        if (value == null || value.isEmpty()) {
+        JsonElement value = fields.get(key);
+        if (value == null || value.isJsonNull()) {
             return defaultValue;
         }
-        return Boolean.parseBoolean(value);
+        return value.getAsBoolean();
     }
 
-    public Map<String, String> getFields() {
-        return Collections.unmodifiableMap(fields);
+    public JsonElement getField(String key) {
+        return copy(fields.get(key));
     }
 
-    private static String encode(String value) {
-        try {
-            return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException(e);
+    public JsonObject getObject(String key) {
+        JsonElement value = fields.get(key);
+        if (value == null || value.isJsonNull()) {
+            return new JsonObject();
         }
+        return value.getAsJsonObject().deepCopy();
     }
 
-    private static String decode(String value) {
-        try {
-            return URLDecoder.decode(value == null ? "" : value, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException(e);
+    public JsonObject getFields() {
+        return fields.deepCopy();
+    }
+
+    private static JsonObject objectOrEmpty(JsonElement element) {
+        if (element == null || element.isJsonNull()) {
+            return new JsonObject();
         }
+        return element.getAsJsonObject();
+    }
+
+    private static String valueAsString(JsonElement element) {
+        if (element == null || element instanceof JsonNull || element.isJsonNull()) {
+            return "";
+        }
+        if (element.isJsonPrimitive()) {
+            return element.getAsString();
+        }
+        return GSON.toJson(element);
+    }
+
+    private static JsonObject copyObject(JsonObject object) {
+        if (object == null) {
+            return new JsonObject();
+        }
+        return object.deepCopy();
+    }
+
+    private static JsonElement copy(JsonElement value) {
+        if (value == null || value.isJsonNull()) {
+            return JsonNull.INSTANCE;
+        }
+        return value.deepCopy();
     }
 
     public static class Builder {
         private final String type;
         private String requestId = "";
-        private final Map<String, String> fields = new LinkedHashMap<>();
+        private final JsonObject fields = new JsonObject();
 
         private Builder(String type) {
             this.type = type;
@@ -147,17 +153,24 @@ public class SocketMessage {
 
         public Builder put(String key, String value) {
             if (key != null && !key.trim().isEmpty()) {
-                fields.put(key, value == null ? "" : value);
+                fields.add(key, value == null ? JsonNull.INSTANCE : new JsonPrimitive(value));
             }
             return this;
         }
 
         public Builder put(String key, int value) {
-            return put(key, String.valueOf(value));
+            return put(key, new JsonPrimitive(value));
         }
 
         public Builder put(String key, boolean value) {
-            return put(key, String.valueOf(value));
+            return put(key, new JsonPrimitive(value));
+        }
+
+        public Builder put(String key, JsonElement value) {
+            if (key != null && !key.trim().isEmpty()) {
+                fields.add(key, copy(value));
+            }
+            return this;
         }
 
         public SocketMessage build() {

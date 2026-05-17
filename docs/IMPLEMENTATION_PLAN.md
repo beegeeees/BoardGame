@@ -25,6 +25,8 @@ Done:
 - Implemented the socket server entry point and OkHttp Android socket client.
 - Implemented create, join, matchmaking, ready state, start game, dice roll, tile effect, and starter mini/micro score commands.
 - Implemented room and game snapshot broadcasts.
+- Switched socket message envelope from form-encoded text to JSON.
+- Replaced compact snapshot string fields with nested JSON room/game payloads.
 - Implemented server Firebase ID token verification for room entry commands.
 - Prevented one verified UID from being seated in multiple active rooms.
 
@@ -155,7 +157,6 @@ Tasks:
 - Add scheduled cleanup for abandoned rooms, stale matchmaking rooms, and inactive games.
 - Replace raw exception details in `REQUEST_ERROR` with stable protocol error codes such as `ROOM_NOT_FOUND`, `ROOM_FULL`, `NOT_HOST`, `NOT_YOUR_TURN`, and `INVALID_STATE`.
 - Add protocol versioning or a handshake field before changing message shapes.
-- Decide whether to keep form-encoded messages or move to JSON before payloads grow further.
 - Add structured logs for room creation, joins, disconnects, command failures, and game transitions.
 - Add metrics for active rooms, connected players, command latency, and error rates.
 - Decide whether match history or reconnect-safe game state needs persistence.

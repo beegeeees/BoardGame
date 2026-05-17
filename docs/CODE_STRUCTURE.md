@@ -19,8 +19,7 @@ BoardGame/
 │       ├── controller/socket/
 │       │   └── SocketRoomController.java
 │       ├── socket/
-│       │   ├── BoardGameSocketClient.java
-│       │   └── SocketSnapshotMapper.java
+│       │   └── BoardGameSocketClient.java
 │       └── MainActivity.java
 ├── shared/
 │   └── src/main/java/com/example/boardgame/socket/
@@ -47,7 +46,6 @@ Important files:
 app/src/main/java/com/example/boardgame/auth/FirebaseAuthTokenProvider.java
 app/src/main/java/com/example/boardgame/controller/socket/SocketRoomController.java
 app/src/main/java/com/example/boardgame/socket/BoardGameSocketClient.java
-app/src/main/java/com/example/boardgame/socket/SocketSnapshotMapper.java
 ```
 
 ## `shared`
@@ -64,6 +62,7 @@ Important files:
 ```text
 shared/src/main/java/com/example/boardgame/socket/protocol/MessageTypes.java
 shared/src/main/java/com/example/boardgame/socket/protocol/SocketMessage.java
+shared/src/main/java/com/example/boardgame/socket/protocol/SnapshotMessageMapper.java
 shared/src/main/java/com/example/boardgame/socket/protocol/RoomSnapshot.java
 shared/src/main/java/com/example/boardgame/socket/protocol/GameSnapshot.java
 ```

@@ -11,7 +11,7 @@ import com.example.boardgame.server.service.ScoreService;
 import com.example.boardgame.socket.protocol.GameSnapshot;
 import com.example.boardgame.socket.protocol.MessageTypes;
 import com.example.boardgame.socket.protocol.RoomSnapshot;
-import com.example.boardgame.socket.protocol.SnapshotCodec;
+import com.example.boardgame.socket.protocol.SnapshotMessageMapper;
 import com.example.boardgame.socket.protocol.SocketMessage;
 
 public class GameSocketHandler {
@@ -191,12 +191,7 @@ public class GameSocketHandler {
 
     private void publishRoom(Room room) {
         RoomSnapshot snapshot = room.toSnapshot();
-        socketServer.sendToRoom(room.getCode(), SocketMessage.builder(MessageTypes.ROOM_UPDATED)
-                .put("roomCode", snapshot.getCode())
-                .put("hostPlayerId", snapshot.getHostPlayerId())
-                .put("status", snapshot.getStatus())
-                .put("players", SnapshotCodec.encodePlayers(snapshot.getPlayers()))
-                .build());
+        socketServer.sendToRoom(room.getCode(), SnapshotMessageMapper.roomUpdated(snapshot));
     }
 
     private void publishGame(Room room) {
@@ -205,15 +200,7 @@ public class GameSocketHandler {
             return;
         }
         GameSnapshot snapshot = gameState.toSnapshot();
-        socketServer.sendToRoom(room.getCode(), SocketMessage.builder(MessageTypes.GAME_UPDATED)
-                .put("roomCode", snapshot.getRoomCode())
-                .put("currentRound", snapshot.getCurrentRound())
-                .put("finalRound", snapshot.getFinalRound())
-                .put("currentPlayerId", snapshot.getCurrentPlayerId())
-                .put("lastDiceRoll", snapshot.getLastDiceRoll())
-                .put("turnPhase", snapshot.getTurnPhase())
-                .put("turnOrder", SnapshotCodec.encodeIds(snapshot.getTurnOrder()))
-                .build());
+        socketServer.sendToRoom(room.getCode(), SnapshotMessageMapper.gameUpdated(snapshot));
     }
 
     private Room requireBoundRoom(ClientSession session) {

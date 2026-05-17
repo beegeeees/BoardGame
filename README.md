@@ -11,7 +11,7 @@ This is still starter structure code, not a finished multiplayer game.
 Done:
 
 - `app`: Android debug UI with Firebase Auth helper and OkHttp WebSocket client.
-- `shared`: dependency-free socket protocol DTOs shared by app/server.
+- `shared`: JSON socket protocol DTOs shared by app/server.
 - `socket-server`: JVM server using Java-WebSocket and Firebase Admin auth for room creation, joining, matchmaking, ready state, start game, dice rolls, starter tile effects, and starter mini/micro score flows.
 - Balanced server layout: `GameSocketHandler`, `RoomService`, `BoardGameService`, `MiniGameService`, `MicroGameService`, `ScoreService`, and minimal models.
 - Removed old Firebase Realtime Database gameplay code and dependencies.
@@ -74,12 +74,6 @@ Put the real config here:
 
 ```text
 app/google-services.json
-```
-
-Example file:
-
-```text
-app/google-services.json.example
 ```
 
 The socket server verifies client ID tokens with Firebase Admin. Set one of these before running the server:

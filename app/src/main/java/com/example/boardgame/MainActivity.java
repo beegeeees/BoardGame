@@ -12,12 +12,12 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.example.boardgame.auth.FirebaseAuthTokenProvider;
 import com.example.boardgame.controller.socket.SocketRoomController;
-import com.example.boardgame.socket.SocketSnapshotMapper;
 import com.example.boardgame.socket.protocol.ConnectionState;
 import com.example.boardgame.socket.protocol.GameSnapshot;
 import com.example.boardgame.socket.protocol.MessageTypes;
 import com.example.boardgame.socket.protocol.PlayerSnapshot;
 import com.example.boardgame.socket.protocol.RoomSnapshot;
+import com.example.boardgame.socket.protocol.SnapshotMessageMapper;
 import com.example.boardgame.socket.protocol.SocketEventListener;
 import com.example.boardgame.socket.protocol.SocketMessage;
 import com.google.firebase.FirebaseApp;
@@ -154,9 +154,9 @@ public class MainActivity extends AppCompatActivity {
         } else if (MessageTypes.REQUEST_ERROR.equals(message.getType())) {
             appendLog("Request error: " + message.getOrDefault("details", ""));
         } else if (MessageTypes.ROOM_UPDATED.equals(message.getType())) {
-            renderRoom(SocketSnapshotMapper.toRoomSnapshot(message));
+            renderRoom(SnapshotMessageMapper.toRoomSnapshot(message));
         } else if (MessageTypes.GAME_UPDATED.equals(message.getType())) {
-            renderGame(SocketSnapshotMapper.toGameSnapshot(message));
+            renderGame(SnapshotMessageMapper.toGameSnapshot(message));
         } else if (!MessageTypes.APP_PONG.equals(message.getType())) {
             appendLog("Message: " + message.getType());
         }

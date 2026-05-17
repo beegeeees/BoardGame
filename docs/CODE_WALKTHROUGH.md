@@ -1,746 +1,717 @@
-# Code Walkthrough
+# Code Dictionary
 
-This document explains the current project structure for readers who are new to networking and backend game logic. The project is split into three modules:
+This document is not a full method-by-method walkthrough. Simple DTOs, getters, XML views, Gradle basics, and obvious button wiring get brief notes; deeper explanation is reserved for code with real coupling or rule behavior.
 
-- `app`: Android UI and WebSocket client.
-- `shared`: message and snapshot classes used by both Android and the server.
-- `socket-server`: JVM WebSocket server and authoritative game logic.
+Use this as a map for the code that has real coupling: socket protocol shape, Firebase identity, room membership, command routing, and game phase transitions.
 
-The current game can be tested on LAN. It supports room creation, joining, matchmaking, ready state, starting with 1-4 players, dice rolls, starter tile effects, and starter mini/micro score flows.
+## System Shape
 
-## Project Configuration Files
+The project has three runtime boundaries:
 
-### `settings.gradle.kts`
+- `app`: Android debug client. It owns UI, Firebase sign-in, token fetching, and the OkHttp WebSocket.
+- `shared`: protocol code used by both Android and server. It owns message names, JSON wire format, and snapshot mapping.
+- `socket-server`: JVM WebSocket server. It owns authoritative room/game state and verifies Firebase ID tokens with Firebase Admin.
 
-Purpose:
+The important rule is:
 
-- Names the Gradle project.
-- Includes the three modules: `app`, `shared`, and `socket-server`.
-- Configures where Gradle downloads plugins and dependencies.
+```text
+Android sends intentions. Server decides state.
+```
 
-### `build.gradle.kts`
+The client can ask to create a room, ready up, roll, or submit a score. It does not decide player IDs, room membership, dice results, rewards, turn order, or whether an action is legal.
 
-Purpose:
+## End-To-End Command Path
 
-- Top-level Gradle file.
-- Makes Android and Google Services plugins available to subprojects.
+For most commands, the call chain is:
 
-### `gradle/libs.versions.toml`
+```text
+MainActivity button
+-> SocketRoomController
+-> BoardGameSocketClient.send(SocketMessage)
+-> WebSocket text frame
+-> BoardGameSocketServer.onMessage(...)
+-> GameSocketHandler.handle(...)
+-> RoomService / BoardGameService / MiniGameService / MicroGameService
+-> REQUEST_OK or REQUEST_ERROR
+-> ROOM_UPDATED and maybe GAME_UPDATED broadcast
+-> MainActivity.handleSocketMessage(...)
+```
 
-Purpose:
+The most important dependency is `SocketMessage`: both client and server parse the same JSON text format from `shared`.
 
-- Central dependency catalog.
-- Keeps versions for Android Gradle Plugin, Firebase Auth, OkHttp, Java-WebSocket, JUnit, and AndroidX libraries.
+## Brief Reference
 
-### `app/build.gradle.kts`
+These files are simple enough that the important point is mostly where they fit.
 
-Purpose:
+### Build And App Setup
 
-- Configures the Android app module.
-- Adds dependencies on `shared`, Firebase Auth, OkHttp, AppCompat, Material, Activity, and ConstraintLayout.
-- Applies the Google Services plugin only when `app/google-services.json` exists.
+- `settings.gradle.kts`: includes the `app`, `shared`, and `socket-server` modules and configures dependency repositories.
+- `build.gradle.kts`: makes Android and Google Services plugins available to modules.
+- `gradle/libs.versions.toml`: central version catalog for Android, Firebase, Gson, OkHttp, Java-WebSocket, and test dependencies.
+- `app/build.gradle.kts`: Android module config; applies Google Services only when `app/google-services.json` exists.
+- `shared/build.gradle.kts`: plain Java protocol module; exposes Gson because JSON protocol types are part of the shared API.
+- `socket-server/build.gradle.kts`: JVM application module; points Gradle's `run` task at `BoardGameSocketServer`.
+- `app/src/main/AndroidManifest.xml`: declares `MainActivity`, internet permission, and cleartext traffic for local `ws://` testing.
 
-### `shared/build.gradle.kts`
+### Shared Small Types
 
-Purpose:
+- `MessageTypes`: one place for command and broadcast string constants. Add new socket message names here first.
+- `ConnectionState`: Android-facing socket state enum: disconnected, connecting, connected, closing.
+- `SocketEventListener`: callback interface from socket client to UI/controller code.
+- `PlayerSnapshot`: client-safe player view: id, nickname, score, position, ready, host.
+- `RoomSnapshot`: client-safe room view: code, host ID, status, players.
+- `GameSnapshot`: client-safe game view: room code, round, current player, dice, phase, turn order.
 
-- Configures the plain Java protocol module.
-- This module does not depend on Android or Firebase.
+### Server Small Types
 
-### `socket-server/build.gradle.kts`
+- `AuthException`: marks auth failures so `GameSocketHandler` can return `UNAUTHENTICATED` instead of a generic bad request.
+- `AuthVerifier`: injectable auth boundary. Production uses Firebase Admin; tests can pass a fake verifier.
+- `Player`: server-side player state. It includes Firebase UID, so only `toSnapshot()` output should be sent to clients.
+- `MiniGameState`: stores current mini-game type, timer metadata, status, and score submissions.
+- `MicroGameState`: stores tile-triggered micro-game metadata, trigger player, status, and score submissions.
 
-Purpose:
+### Android Debug UI
 
-- Configures the JVM server module.
-- Adds dependencies on `shared` and Java-WebSocket.
-- Defines `BoardGameSocketServer` as the runnable main class.
+- `activity_main.xml`: manual test screen for socket connection, room commands, game commands, score submission, and state display.
+- The UI is intentionally plain. It is a debugging surface, not final game UI architecture.
 
-### `app/src/main/AndroidManifest.xml`
+## Protocol Dictionary
 
-Purpose:
+### `SocketMessage`
 
-- Declares the Android app entry point.
-- Adds `INTERNET` permission for WebSocket networking.
-- Enables cleartext traffic so `ws://` LAN testing works without TLS.
+Path:
 
-## Networking Flow
-
-1. The Android app opens a WebSocket connection to the server URL.
-2. The app sends `SocketMessage` commands such as `CREATE_ROOM` or `ROLL_DICE`.
-3. The server receives the command in `BoardGameSocketServer`.
-4. `BoardGameSocketServer` passes the command to `GameSocketHandler`.
-5. `GameSocketHandler` calls `RoomService` or one of the gameplay services.
-6. The server sends a direct `REQUEST_OK` or `REQUEST_ERROR` response.
-7. The server broadcasts `ROOM_UPDATED` or `GAME_UPDATED` to everyone in the room.
-8. The Android app receives broadcasts and updates the debug UI.
-
-## Android App Files
-
-### `app/src/main/java/com/example/boardgame/MainActivity.java`
-
-Purpose:
-
-- Provides a simple debug screen for LAN testing.
-- Connects UI buttons to socket commands.
-- Displays connection, room, game, and log state.
-
-Important fields:
-
-- `socketController`: UI-facing wrapper around the WebSocket client.
-- `serverUrlInput`: text field for `ws://...` URL.
-- `nicknameInput`: local nickname used when creating/joining rooms.
-- `roomCodeInput`: room code for joining and display.
-- `scoreInput`: temporary score input for mini/micro game testing.
-- `connectionStateText`: shows `CONNECTED`, `DISCONNECTED`, etc.
-- `myPlayerText`: shows the player ID assigned by the server.
-- `roomStateText`: renders room/player state.
-- `gameStateText`: renders current game state.
-- `eventLogText`: shows responses and errors.
-- `myPlayerId`: stores the player ID from `REQUEST_OK`.
-- `eventLog`: keeps visible debug messages.
-
-Methods:
-
-- `onCreate(Bundle)`: initializes the activity, applies edge-to-edge layout, binds views, socket listener, and buttons.
-- `onDestroy()`: disconnects the socket when the activity is destroyed.
-- `bindViews()`: finds all XML views by ID and stores references.
-- `bindSocket()`: registers socket callbacks for state changes, messages, and errors.
-- `bindButtons()`: connects every debug button to one socket command.
-- `handleSocketMessage(SocketMessage)`: routes incoming server messages by type.
-- `renderRoom(RoomSnapshot)`: formats room/player data into readable text.
-- `renderGame(GameSnapshot)`: formats game turn data into readable text.
-- `appendLog(String)`: appends one line to the debug log.
-- `nickname()`: returns the typed nickname or `Player`.
-- `score()`: parses the score field, returning `0` if invalid.
-- `textOf(EditText)`: returns trimmed text from an input.
-- `shortId(String)`: shortens long IDs for display.
-
-### `app/src/main/java/com/example/boardgame/auth/FirebaseAuthTokenProvider.java`
+```text
+shared/src/main/java/com/example/boardgame/socket/protocol/SocketMessage.java
+```
 
 Purpose:
 
-- Gets the current Firebase Auth ID token from Android.
-- This is prepared for real auth, but the LAN server currently accepts an empty token.
+- One WebSocket frame payload.
+- JSON envelope with three top-level fields: `type`, `requestId`, `fields`.
+- `fields` is a `JsonObject`, so it can contain simple values or nested objects/arrays.
 
-Nested types:
+Example command:
 
-- `TokenCallback`: callback interface for success/failure.
+```json
+{
+  "type": "CREATE_ROOM",
+  "requestId": "uuid",
+  "fields": {
+    "nickname": "Player",
+    "firebaseIdToken": "token"
+  }
+}
+```
 
-Methods:
+Example room broadcast:
 
-- `FirebaseAuthTokenProvider()`: uses `FirebaseAuth.getInstance()`.
-- `FirebaseAuthTokenProvider(FirebaseAuth)`: allows dependency injection for testing.
-- `requireIdToken(TokenCallback)`: gets the signed-in user token or returns an error if no user is signed in.
-- `TokenCallback.onToken(String)`: called with a Firebase ID token.
-- `TokenCallback.onError(Exception)`: called when token loading fails.
+```json
+{
+  "type": "ROOM_UPDATED",
+  "requestId": "",
+  "fields": {
+    "room": {
+      "code": "123456",
+      "hostPlayerId": "player-id",
+      "status": "WAITING",
+      "players": []
+    }
+  }
+}
+```
 
-### `app/src/main/java/com/example/boardgame/controller/socket/SocketRoomController.java`
+Key details:
 
-Purpose:
+- `getOrDefault`, `getInt`, and `getBoolean` are convenience methods for simple command/response fields.
+- `getObject` is used for nested payloads like `fields.room` and `fields.game`.
+- `put(String, JsonElement)` exists so snapshots can be sent as JSON objects instead of encoded strings.
+- `getFields` returns a defensive copy. Do not mutate it expecting the message to change.
 
-- Gives the Android UI simple method names instead of requiring it to build raw socket messages.
-- This is the Android-side controller for room/game commands.
+Change risk:
 
-Fields:
+- Any wire-format change must be compatible across Android and server at the same time.
+- If you add protocol versioning later, this is the natural place to add a top-level `version`.
 
-- `socketClient`: lower-level WebSocket client.
+### `SnapshotMessageMapper`
 
-Methods:
+Path:
 
-- `SocketRoomController()`: creates a default `BoardGameSocketClient`.
-- `SocketRoomController(BoardGameSocketClient)`: allows passing a custom client.
-- `setListener(SocketEventListener)`: receives connection/messages/errors.
-- `connect(String)`: opens a WebSocket connection.
-- `disconnect()`: closes the WebSocket connection.
-- `createRoom(String, String)`: sends `CREATE_ROOM`.
-- `joinRoom(String, String, String)`: sends `JOIN_ROOM`.
-- `matchmake(String, String)`: sends `MATCHMAKE`.
-- `setReady(boolean)`: sends `SET_READY`.
-- `startGame()`: sends `START_GAME`.
-- `rollDice()`: sends `ROLL_DICE`.
-- `applyTileEffect()`: sends `APPLY_TILE_EFFECT`.
-- `startMiniGame(String)`: sends `START_MINI_GAME`.
-- `submitMiniGameScore(int)`: sends `SUBMIT_MINI_GAME_SCORE`.
-- `finishMiniGame()`: sends `FINISH_MINI_GAME`.
-- `submitMicroGameScore(int)`: sends `SUBMIT_MICRO_GAME_SCORE`.
-- `finishMicroGame()`: sends `FINISH_MICRO_GAME`.
-- `commandBuilder(String, String, String)`: builds commands that include nickname and Firebase token.
-
-### `app/src/main/java/com/example/boardgame/socket/BoardGameSocketClient.java`
-
-Purpose:
-
-- Owns the Android WebSocket connection using OkHttp.
-- Sends serialized `SocketMessage` text.
-- Converts incoming text back into `SocketMessage`.
-
-Fields:
-
-- `HEARTBEAT_SECONDS`: interval for app-level ping.
-- `NORMAL_CLOSE`: WebSocket close code for normal disconnect.
-- `okHttpClient`: OkHttp networking client.
-- `listener`: app callback receiver.
-- `heartbeatExecutor`: background heartbeat scheduler.
-- `webSocket`: active OkHttp WebSocket.
-- `state`: current connection state.
-
-Methods:
-
-- `BoardGameSocketClient()`: creates a default OkHttp client.
-- `BoardGameSocketClient(OkHttpClient)`: allows custom OkHttp setup.
-- `setListener(SocketEventListener)`: registers callbacks.
-- `connect(String)`: opens a WebSocket to the server URL.
-- `send(SocketMessage)`: sends one command if connected.
-- `disconnect()`: stops heartbeat and closes the socket.
-- `getState()`: returns current connection state.
-- `startHeartbeat()`: sends `APP_PING` regularly.
-- `stopHeartbeat()`: stops the heartbeat thread.
-- `changeState(ConnectionState)`: stores and reports connection state.
-- `notifyError(Throwable)`: reports errors to the listener.
-
-Inner class `BoardGameWebSocketListener`:
-
-- `onOpen(WebSocket, Response)`: marks connection as connected and starts heartbeat.
-- `onMessage(WebSocket, String)`: parses server text into `SocketMessage`.
-- `onClosing(WebSocket, int, String)`: marks the connection as closing.
-- `onClosed(WebSocket, int, String)`: clears socket and marks disconnected.
-- `onFailure(WebSocket, Throwable, Response)`: reports network failure and marks disconnected.
-
-### `app/src/main/java/com/example/boardgame/socket/SocketSnapshotMapper.java`
+```text
+shared/src/main/java/com/example/boardgame/socket/protocol/SnapshotMessageMapper.java
+```
 
 Purpose:
 
-- Converts generic socket messages into typed snapshot objects for UI rendering.
+- Converts server-side DTO snapshots into nested JSON socket messages.
+- Converts incoming nested JSON messages back into typed `RoomSnapshot` and `GameSnapshot`.
 
-Methods:
+Server usage:
 
-- `toRoomSnapshot(SocketMessage)`: reads a `ROOM_UPDATED` message.
-- `toGameSnapshot(SocketMessage)`: reads a `GAME_UPDATED` message.
+```text
+GameSocketHandler.publishRoom -> SnapshotMessageMapper.roomUpdated
+GameSocketHandler.publishGame -> SnapshotMessageMapper.gameUpdated
+```
 
-## Shared Protocol Files
+Android usage:
 
-### `shared/src/main/java/com/example/boardgame/socket/protocol/ConnectionState.java`
+```text
+MainActivity.handleSocketMessage -> SnapshotMessageMapper.toRoomSnapshot
+MainActivity.handleSocketMessage -> SnapshotMessageMapper.toGameSnapshot
+```
 
-Purpose:
+Why this exists:
 
-- Enum used by the Android client to report connection status.
+- Snapshot JSON is shared protocol, not Android-only mapping.
+- Keeping it in `shared` prevents Android and server from silently disagreeing about field names.
 
-Values:
+Change risk:
 
-- `DISCONNECTED`: no active socket.
-- `CONNECTING`: socket opening is in progress.
-- `CONNECTED`: socket is open.
-- `CLOSING`: socket is closing.
+- If you add fields to `RoomSnapshot`, `GameSnapshot`, or `PlayerSnapshot`, update both directions here.
+- Keep missing-field defaults conservative; older clients may receive newer messages or vice versa during development.
 
-### `shared/src/main/java/com/example/boardgame/socket/protocol/MessageTypes.java`
+## Android Client Dictionary
 
-Purpose:
+### `MainActivity`
 
-- Central list of message type strings.
-- Prevents typos between Android and server.
+Path:
 
-Fields:
+```text
+app/src/main/java/com/example/boardgame/MainActivity.java
+```
 
-- Client commands: `CREATE_ROOM`, `JOIN_ROOM`, `MATCHMAKE`, `SET_READY`, `START_GAME`, `ROLL_DICE`, `APPLY_TILE_EFFECT`, mini/micro commands, `APP_PING`.
-- Server responses/broadcasts: `REQUEST_OK`, `REQUEST_ERROR`, `ROOM_UPDATED`, `GAME_UPDATED`, `MINI_GAME_UPDATED`, `MICRO_GAME_UPDATED`, `SERVER_NOTICE`, `APP_PONG`.
+Role:
 
-### `shared/src/main/java/com/example/boardgame/socket/protocol/SocketEventListener.java`
+- Temporary debug UI and manual test harness.
+- Not production architecture.
 
-Purpose:
+Important behavior:
 
-- Callback interface used by Android UI to react to socket events.
+- Initializes Firebase after views are bound, not as a field initializer.
+- Wraps room-entry commands with `withIdToken(...)`.
+- Renders server snapshots, but does not validate game rules.
 
-Methods:
+Auth flow:
 
-- `onStateChanged(ConnectionState)`: called when connection state changes.
-- `onMessage(SocketMessage)`: called for incoming server messages.
-- `onError(Throwable)`: called for network or parsing errors.
+```text
+Create/join/matchmake button
+-> withIdToken
+-> FirebaseAuthTokenProvider.requireIdToken
+-> SocketRoomController command with token
+```
 
-### `shared/src/main/java/com/example/boardgame/socket/protocol/SocketMessage.java`
+Error behavior:
 
-Purpose:
+- Missing `app/google-services.json` is shown in the debug log instead of crashing.
+- Firebase backend setup errors are translated into more useful UI messages where possible.
 
-- Represents one command, response, or broadcast.
-- Encodes messages as URL-form text such as `type=CREATE_ROOM&requestId=...`.
+Change risk:
 
-Fields:
+- Do not create `FirebaseAuth.getInstance()` before Firebase initialization.
+- Do not put Admin SDK credentials or service-account paths here. Android only uses `app/google-services.json`.
 
-- `FIELD_TYPE`: key name for message type.
-- `FIELD_REQUEST_ID`: key name for request ID.
-- `type`: command/response name.
-- `requestId`: ID used to match responses to requests.
-- `fields`: extra key/value data.
+### `FirebaseAuthTokenProvider`
 
-Methods:
+Path:
 
-- `command(String)`: creates a command with a generated request ID.
-- `builder(String)`: starts manual message building.
-- `parse(String)`: converts wire text into a `SocketMessage`.
-- `toWireText()`: converts a `SocketMessage` into wire text.
-- `getType()`: returns message type.
-- `getRequestId()`: returns request ID.
-- `get(String)`: returns one field or `null`.
-- `getOrDefault(String, String)`: returns a field with fallback.
-- `getInt(String, int)`: returns an integer field.
-- `getBoolean(String, boolean)`: returns a boolean field.
-- `getFields()`: returns all extra fields.
-- `encode(String)`: URL-encodes a value.
-- `decode(String)`: URL-decodes a value.
+```text
+app/src/main/java/com/example/boardgame/auth/FirebaseAuthTokenProvider.java
+```
 
-Inner class `Builder`:
+Role:
 
-- `Builder(String)`: stores message type.
-- `requestId(String)`: sets request ID.
-- `put(String, String)`: adds text field.
-- `put(String, int)`: adds integer field.
-- `put(String, boolean)`: adds boolean field.
-- `build()`: creates immutable `SocketMessage`.
+- Produces Firebase ID tokens for room-entry commands.
 
-### `shared/src/main/java/com/example/boardgame/socket/protocol/PlayerSnapshot.java`
+Important behavior:
 
-Purpose:
+- If no user is signed in, it calls anonymous sign-in.
+- After sign-in, it requests an ID token with `getIdToken(false)`.
+- The ID token is sent to the socket server; the Android client never sends a trusted UID directly.
 
-- Read-only player data sent to clients.
+Dependencies:
 
-Fields and getters:
+- Requires `app/google-services.json`.
+- Requires Anonymous auth enabled in Firebase Console.
 
-- `id`, `getId()`: server player ID.
-- `nickname`, `getNickname()`: display name.
-- `score`, `getScore()`: board score.
-- `position`, `getPosition()`: board tile index.
-- `ready`, `isReady()`: lobby ready state.
-- `host`, `isHost()`: whether player is room host.
+Change risk:
 
-### `shared/src/main/java/com/example/boardgame/socket/protocol/RoomSnapshot.java`
+- If you replace anonymous auth with Google/email/etc., keep the output contract the same: return a Firebase ID token.
 
-Purpose:
+### `BoardGameSocketClient`
 
-- Read-only room data sent to clients.
+Path:
 
-Fields and getters:
+```text
+app/src/main/java/com/example/boardgame/socket/BoardGameSocketClient.java
+```
 
-- `code`, `getCode()`: room code.
-- `hostPlayerId`, `getHostPlayerId()`: current host.
-- `status`, `getStatus()`: `WAITING`, `READY`, `IN_GAME`, or `FINISHED`.
-- `players`, `getPlayers()`: list of `PlayerSnapshot`.
+Role:
 
-### `shared/src/main/java/com/example/boardgame/socket/protocol/GameSnapshot.java`
+- Low-level OkHttp WebSocket wrapper.
 
-Purpose:
+Important behavior:
 
-- Read-only game turn data sent to clients.
+- `connect` ignores duplicate connect attempts while already connecting/connected.
+- `send` refuses to send unless state is `CONNECTED`.
+- A background heartbeat sends `APP_PING` every 20 seconds.
+- Incoming text is parsed immediately with `SocketMessage.parse`.
 
-Fields and getters:
+Change risk:
 
-- `roomCode`, `getRoomCode()`: room this game belongs to.
-- `currentRound`, `getCurrentRound()`: current round number.
-- `finalRound`, `getFinalRound()`: final round number.
-- `currentPlayerId`, `getCurrentPlayerId()`: whose turn it is.
-- `lastDiceRoll`, `getLastDiceRoll()`: last server dice result.
-- `turnPhase`, `getTurnPhase()`: current phase string.
-- `turnOrder`, `getTurnOrder()`: ordered player IDs.
+- Socket callbacks are not guaranteed to run on the Android UI thread. `MainActivity` uses `runOnUiThread` before touching views.
+- If parse errors should not kill callbacks, add a try/catch around `SocketMessage.parse` here and report `onError`.
 
-### `shared/src/main/java/com/example/boardgame/socket/protocol/SnapshotCodec.java`
+### `SocketRoomController`
 
-Purpose:
+Path:
 
-- Encodes snapshot lists into a string field.
-- Decodes snapshot string fields back into typed lists.
+```text
+app/src/main/java/com/example/boardgame/controller/socket/SocketRoomController.java
+```
 
-Methods:
+Role:
 
-- `encodePlayers(List<PlayerSnapshot>)`: converts players into compact text.
-- `decodePlayers(String)`: restores players from compact text.
-- `encodeIds(List<String>)`: converts ID lists into compact text.
-- `decodeIds(String)`: restores ID lists.
-- `encode(String)`: Base64 URL-encodes one value.
-- `decode(String)`: Base64 URL-decodes one value.
-- `parseInt(String)`: safely parses an integer field.
+- Thin Android-side command facade.
+- Converts UI intent into `SocketMessage` commands.
 
-## Socket Server Files
+Important behavior:
 
-### `socket-server/src/main/java/com/example/boardgame/server/BoardGameSocketServer.java`
+- Room-entry commands include `nickname` and `firebaseIdToken`.
+- Other commands rely on the server-bound `ClientSession`; they do not resend player ID or UID.
 
-Purpose:
+Change risk:
 
-- Starts the JVM WebSocket server using Java-WebSocket.
-- Owns all connected sessions.
-- Forwards messages to `GameSocketHandler`.
-- Broadcasts messages to players in a room.
+- Do not add client-selected player IDs here. The server assigns and remembers player identity after token verification.
 
-Fields:
+## Server Entry And Session Dictionary
 
-- `DEFAULT_PORT`: port used when no CLI argument is supplied.
-- `sessions`: maps WebSocket connections to `ClientSession`.
-- `gameSocketHandler`: command handler and game coordinator.
+### `BoardGameSocketServer`
 
-Methods:
+Path:
 
-- `BoardGameSocketServer(int)`: binds the server to a port.
-- `main(String[])`: starts the server process.
-- `onOpen(WebSocket, ClientHandshake)`: creates a session for a new connection.
-- `onMessage(WebSocket, String)`: parses text and routes commands.
-- `onClose(WebSocket, int, String, boolean)`: removes session and notifies game logic.
-- `onError(WebSocket, Exception)`: logs server socket errors.
-- `onStart()`: logs startup and enables connection timeout.
-- `sendToRoom(String, SocketMessage)`: sends one broadcast to every session in a room.
+```text
+socket-server/src/main/java/com/example/boardgame/server/BoardGameSocketServer.java
+```
 
-### `socket-server/src/main/java/com/example/boardgame/server/ClientSession.java`
+Role:
 
-Purpose:
+- WebSocket server lifecycle.
+- Owns the map from raw WebSocket connections to `ClientSession`.
 
-- Represents one connected client.
-- Stores which room/player the WebSocket belongs to.
+Important behavior:
 
-Fields:
+- Creates a `ClientSession` in `onOpen`.
+- Parses every text message as `SocketMessage` in `onMessage`.
+- Handles `APP_PING` locally by returning `APP_PONG`.
+- For all other message types, delegates to `GameSocketHandler`.
+- On close, removes the session and tells game logic to disconnect the player.
 
-- `connectionId`: temporary ID for the socket connection.
-- `webSocket`: Java-WebSocket connection object.
-- `roomCode`: room currently joined.
-- `playerId`: player ID currently bound.
-- `firebaseUid`: verified Firebase UID currently bound.
+Change risk:
 
-Methods:
+- This class should stay transport-focused. Game rules belong in services, not here.
 
-- `ClientSession(WebSocket)`: wraps one WebSocket.
-- `bindPlayer(String, String, String)`: associates the connection with a room/player/UID.
-- `send(SocketMessage)`: sends one message to the client.
-- `sendError(SocketMessage, String, String)`: sends `REQUEST_ERROR`.
-- `close()`: closes the WebSocket.
-- `getConnectionId()`: returns connection ID.
-- `getRoomCode()`: returns bound room code.
-- `getPlayerId()`: returns bound player ID.
-- `getFirebaseUid()`: returns bound Firebase UID.
+### `ClientSession`
 
-### `socket-server/src/main/java/com/example/boardgame/server/GameSocketHandler.java`
+Path:
 
-Purpose:
+```text
+socket-server/src/main/java/com/example/boardgame/server/ClientSession.java
+```
 
-- Converts socket commands into service calls.
-- Sends success/error responses.
-- Broadcasts updated room/game snapshots.
+Role:
 
-Fields:
+- Server-side identity for one WebSocket connection.
 
-- `socketServer`: used for broadcasting.
-- `authVerifier`: validates or assigns user identity.
-- `roomService`: owns room/lobby state.
-- `gameService`: owns gameplay rules.
+State it owns:
 
-Methods:
+- `connectionId`: temporary socket ID before authentication.
+- `roomCode`: room bound after create/join/matchmake.
+- `playerId`: server-generated player ID.
+- `firebaseUid`: verified Firebase UID.
 
-- `GameSocketHandler(BoardGameSocketServer, AuthVerifier)`: wires dependencies.
-- `handle(ClientSession, SocketMessage)`: main command entry point.
-- `disconnect(ClientSession)`: removes a player when a socket closes.
-- `handleCommand(ClientSession, SocketMessage)`: routes command type to a private method.
-- `createRoom(ClientSession, SocketMessage)`: handles `CREATE_ROOM`.
-- `joinRoom(ClientSession, SocketMessage)`: handles `JOIN_ROOM`.
-- `matchmake(ClientSession, SocketMessage)`: handles `MATCHMAKE`.
-- `setReady(ClientSession, SocketMessage)`: handles `SET_READY`.
-- `startGame(ClientSession)`: handles `START_GAME`.
-- `rollDice(ClientSession)`: handles `ROLL_DICE`.
-- `applyTileEffect(ClientSession)`: handles `APPLY_TILE_EFFECT`.
-- `startMiniGame(ClientSession, SocketMessage)`: handles `START_MINI_GAME`.
-- `submitMiniGameScore(ClientSession, SocketMessage)`: handles `SUBMIT_MINI_GAME_SCORE`.
-- `finishMiniGame(ClientSession)`: handles `FINISH_MINI_GAME`.
-- `submitMicroGameScore(ClientSession, SocketMessage)`: handles `SUBMIT_MICRO_GAME_SCORE`.
-- `finishMicroGame(ClientSession)`: handles `FINISH_MICRO_GAME`.
-- `sendOk(ClientSession, SocketMessage, Result)`: sends `REQUEST_OK`.
-- `publishRoom(Room)`: broadcasts `ROOM_UPDATED`.
-- `publishGame(Room)`: broadcasts `GAME_UPDATED`.
-- `requireBoundRoom(ClientSession)`: loads the room for a session.
-- `requireNotInRoom(ClientSession)`: prevents joining twice on one connection.
-- `verify(SocketMessage, ClientSession)`: obtains the server identity for the player.
+Important behavior:
 
-Inner class `Result`:
+- `bindPlayer` is called only after Firebase token verification and successful room membership.
+- `sendError` preserves the request ID so the client can connect errors to commands.
 
-- Holds the affected room, player, and whether game state should be broadcast.
-- `roomOnly(Room, Player)`: result for lobby-only changes.
-- `roomAndGame(Room, Player)`: result for game changes.
+Change risk:
 
-### `socket-server/src/main/java/com/example/boardgame/server/AuthVerifier.java`
+- Session state is connection-bound. Reconnect/resume will require a new design because a fresh WebSocket creates a fresh `ClientSession`.
 
-Purpose:
+## Authentication Dictionary
 
-- Interface for validating a user identity.
-- Implementations return the trusted UID after token verification.
+### `FirebaseAdminAuthVerifier`
 
-Methods:
+Path:
 
-- `verify(String, String)`: returns trusted user ID for a token/connection.
+```text
+socket-server/src/main/java/com/example/boardgame/server/FirebaseAdminAuthVerifier.java
+```
 
-### `socket-server/src/main/java/com/example/boardgame/server/FirebaseAdminAuthVerifier.java`
+Role:
 
-Purpose:
+- Converts an Android Firebase ID token into a trusted Firebase UID.
 
-- Verifies Firebase ID tokens with Firebase Admin SDK.
-- Checks token revocation and returns the verified Firebase UID.
-- Loads credentials from `FIREBASE_SERVICE_ACCOUNT` or `GOOGLE_APPLICATION_CREDENTIALS`.
+Credential lookup:
 
-Methods:
+```text
+FIREBASE_SERVICE_ACCOUNT
+or
+GOOGLE_APPLICATION_CREDENTIALS
+```
 
-- `verify(String, String)`: returns the verified Firebase UID.
+Important behavior:
 
-## Server Model Files
+- Empty tokens are rejected.
+- `verifyIdToken(token, true)` checks revocation.
+- The verified UID is returned to server room logic.
 
-### `socket-server/src/main/java/com/example/boardgame/server/model/Room.java`
+Change risk:
 
-Purpose:
+- This file must never load Android `google-services.json`.
+- Admin SDK JSON is a server secret and must not be committed.
 
-- Holds one room’s players, status, and current game states.
+### `AuthVerifier`
 
-Fields:
+Path:
 
-- Status constants: `WAITING`, `READY`, `IN_GAME`, `FINISHED`.
-- `code`: room code.
-- `createdAtMillis`: creation time.
-- `updatedAtMillis`: last state change time.
-- `hostPlayerId`: current host.
-- `status`: room lifecycle state.
-- `players`: players by player ID.
-- `gameState`: board-game turn state.
-- `miniGameState`: current mini game.
-- `microGameState`: current micro game.
+```text
+socket-server/src/main/java/com/example/boardgame/server/AuthVerifier.java
+```
 
-Methods:
+Role:
 
-- `Room(String)`: creates a room.
-- `addPlayer(Player)`: adds player and assigns host if needed.
-- `removePlayer(String)`: removes player and reassigns host.
-- `canStart(int)`: true when enough players are present and all are ready.
-- `refreshReadyStatus(int)`: updates `WAITING`/`READY`.
-- `toSnapshot()`: creates a client-safe `RoomSnapshot`.
-- `touch()`: updates modified time.
-- Getters/setters: expose room fields and update state.
+- Small interface so auth verification can be injected in tests.
 
-### `socket-server/src/main/java/com/example/boardgame/server/model/Player.java`
+Change risk:
 
-Purpose:
+- Keep the interface returning a trusted UID, not a client-provided identity.
 
-- Holds server-side player state.
+## Command Coordinator Dictionary
 
-Fields:
+### `GameSocketHandler`
 
-- `id`: server-generated player ID.
-- `firebaseUid`: auth identity.
-- `nickname`: display name.
-- `score`: total score.
-- `position`: board tile position.
-- `ready`: lobby ready flag.
-- `host`: room host flag.
-- `itemCards`: card inventory.
+Path:
 
-Methods:
+```text
+socket-server/src/main/java/com/example/boardgame/server/GameSocketHandler.java
+```
 
-- `Player(String, String, String)`: creates a player.
-- `moveBy(int, int)`: moves around the board with wraparound.
-- `addScore(int)`: changes score.
-- `addItemCard(String)`: adds a card.
-- `toSnapshot()`: creates client-safe `PlayerSnapshot`.
-- Getters/setters: expose player state.
+Role:
 
-### `socket-server/src/main/java/com/example/boardgame/server/model/GameState.java`
+- Central command coordinator.
+- Converts validated socket commands into service calls.
+- Sends direct responses and broadcasts snapshots.
 
-Purpose:
+Main pattern:
 
-- Holds board-game turn state.
+```text
+handle
+-> handleCommand
+-> service method
+-> sendOk
+-> publishRoom
+-> publishGame if needed
+```
 
-Fields:
+Authentication boundary:
 
-- Phase constants: `WAITING_FOR_ROLL`, `TILE_EFFECT`, `MINI_GAME`, `MICRO_GAME`, `ROUND_END`, `FINISHED`.
-- `roomCode`: room this state belongs to.
-- `finalRound`: last round.
-- `currentRound`: current round.
-- `currentPlayerIndex`: index inside turn order.
-- `lastDiceRoll`: last dice value.
-- `turnPhase`: current phase.
-- `turnOrder`: ordered player IDs.
+- `CREATE_ROOM`, `JOIN_ROOM`, and `MATCHMAKE` call `verify(...)`.
+- After that, `ClientSession.bindPlayer(...)` stores room/player/UID.
+- Later commands trust the bound session, not fields from the client.
 
-Methods:
+Error mapping:
 
-- `GameState(String, int)`: creates game state.
-- `setTurnOrder(List<String>)`: sets player turn order.
-- `getCurrentPlayerId()`: returns current turn player.
-- `advanceTurn()`: moves to next player or round end.
-- `advanceRound()`: starts next round or finishes game.
-- `toSnapshot()`: creates client-safe `GameSnapshot`.
-- Getters/setters: expose game state.
+- `AuthException` becomes `REQUEST_ERROR errorCode=UNAUTHENTICATED`.
+- `IllegalArgumentException` and `IllegalStateException` become `BAD_REQUEST`.
 
-### `socket-server/src/main/java/com/example/boardgame/server/model/MiniGameState.java`
+Broadcast behavior:
 
-Purpose:
+- Most successful commands publish `ROOM_UPDATED`.
+- Gameplay commands use `Result.roomAndGame(...)`, which also publishes `GAME_UPDATED`.
 
-- Holds one end-of-round mini game.
+Change risk:
 
-Fields:
+- If you add a new command, decide whether it requires auth token verification or an already-bound room session.
+- Do not let command handlers directly mutate random model state unless the relevant service owns that rule.
+- The whole `handle` method is synchronized, which simplifies in-memory state safety. If this becomes high-traffic, concurrency needs a more deliberate design.
 
-- Status constants: `RUNNING`, `FINISHED`.
-- `id`: mini game ID.
-- `type`: mini game type name.
-- `startedAtMillis`: start time.
-- `durationMillis`: planned duration.
-- `status`: running/finished.
-- `scoresByPlayerId`: submitted scores.
+## Room Membership Dictionary
 
-Methods:
+### `RoomService`
 
-- `MiniGameState(String, String, long, int)`: creates mini game state.
-- `submitScore(String, int)`: records one player score.
-- Getters/setters: expose mini game state.
+Path:
 
-### `socket-server/src/main/java/com/example/boardgame/server/model/MicroGameState.java`
+```text
+socket-server/src/main/java/com/example/boardgame/server/service/RoomService.java
+```
 
-Purpose:
+Role:
 
-- Holds one tile-triggered micro game.
+- Owns room creation, joining, matchmaking, ready state, and disconnect cleanup.
 
-Fields:
+Important constraints:
 
-- Status constants: `RUNNING`, `FINISHED`.
-- `id`: micro game ID.
-- `type`: micro game type name.
-- `triggerPlayerId`: player who triggered it.
-- `startedAtMillis`: start time.
-- `durationMillis`: planned duration.
-- `status`: running/finished.
-- `scoresByPlayerId`: submitted scores.
+- `MIN_PLAYERS = 1` for current testing.
+- `MAX_PLAYERS = 4`.
+- A Firebase UID can only be seated in one active room.
+- Join/matchmake only target rooms in `WAITING` or `READY`.
 
-Methods:
+Room code behavior:
 
-- `MicroGameState(String, String, String, long, int)`: creates micro game state.
-- `submitScore(String, int)`: records one player score.
-- Getters/setters: expose micro game state.
+- Room codes are random six-digit strings.
+- The generator retries until unused.
 
-## Server Service Files
+Disconnect behavior:
 
-### `socket-server/src/main/java/com/example/boardgame/server/service/RoomService.java`
+- Removes the player from the room.
+- Deletes the room if empty.
+- Otherwise recalculates ready status and host ownership through `Room.removePlayer`.
 
-Purpose:
+Change risk:
 
-- Owns lobby and room membership logic.
-- Stores rooms in memory for LAN testing.
+- Reconnect/resume will conflict with immediate removal on disconnect. Add a grace period before changing this behavior.
+- `requireUidAvailable` scans all rooms. Fine for LAN testing; replace with an index if persistence/scale matters.
 
-Fields:
+### `Room`
 
-- `MIN_PLAYERS`: minimum players required to start.
-- `MAX_PLAYERS`: maximum room size.
-- `rooms`: in-memory room map.
-- `random`: room code generator randomness.
+Path:
 
-Nested class `MatchResult`:
+```text
+socket-server/src/main/java/com/example/boardgame/server/model/Room.java
+```
 
-- Holds room and player returned by matchmaking.
-- `getRoom()`: matched room.
-- `getPlayer()`: joined/created player.
+Role:
 
-Methods:
+- In-memory aggregate for lobby, players, and active game state.
 
-- `createRoom(String, String)`: creates room and host player.
-- `joinRoom(String, String, String)`: joins an existing room.
-- `matchmake(String, String)`: joins an open room or creates one.
-- `setReady(String, String, boolean)`: updates ready state.
-- `disconnect(String, String)`: removes player and possibly room.
-- `requireRoom(String)`: returns room or throws.
-- `requirePlayer(Room, String)`: returns player or throws.
-- `requireHost(Room, String)`: validates host-only commands.
-- `getRooms()`: returns current rooms.
-- `createPlayer(String, String)`: creates a server player.
-- `createUniqueRoomCode()`: generates unused room code.
+Important behavior:
 
-### `socket-server/src/main/java/com/example/boardgame/server/service/BoardGameService.java`
+- First player becomes host.
+- When host leaves, another player becomes host.
+- `refreshReadyStatus` maps player readiness to room status.
+- `toSnapshot` strips server-only details and returns client-safe state.
 
-Purpose:
+Change risk:
 
-- Owns the main board flow.
-- Handles game start, turn ownership, dice rolls, movement, and starter tile effects.
+- Keep Firebase UID and other server-only secrets out of snapshots.
 
-Fields:
+## Main Game Dictionary
 
-- `BOARD_SIZE`: number of board tiles.
-- `FINAL_ROUND`: number of rounds.
-- Tile constants: starter tile type names.
-- `random`: server-side randomness.
+### `BoardGameService`
 
-Methods:
+Path:
 
-- `startGame(Room)`: creates `GameState` and sets room `IN_GAME`.
-- `rollDice(Room, String)`: validates turn, rolls server dice, moves player.
-- `applyTileEffect(Room, String)`: applies starter tile behavior and returns the tile type.
-- `requireGameState(Room)`: gets active game or throws.
-- `requirePlayer(Room, String)`: validates player exists.
-- `requirePhase(GameState, String)`: validates game phase.
-- `getTileType(int)`: returns starter tile type for a board position.
-- `requireCurrentPlayer(GameState, String)`: validates turn ownership.
+```text
+socket-server/src/main/java/com/example/boardgame/server/service/BoardGameService.java
+```
 
-### `socket-server/src/main/java/com/example/boardgame/server/service/MiniGameService.java`
+Role:
 
-Purpose:
+- Owns authoritative board-game flow.
 
-- Owns end-of-round mini game flow.
+Current starter rules:
 
-Fields:
+- Board size is 16.
+- Final round is 3.
+- Dice roll is server random, 1-6.
+- Tile type is derived from position:
+  - `0`: `START`
+  - divisible by `8`: `GAME`
+  - divisible by `6`: `CARD`
+  - divisible by `5`: `QUESTION_MARK`
+  - otherwise `NORMAL`
 
-- `MINI_GAME_DURATION_MILLIS`: mini game duration.
-- `MINI_GAME_SCORE_BY_RANK`: rewards for mini game rank.
-- `boardGameService`: shared board-state validation helper.
-- `scoreService`: ranking and reward helper.
+Phase flow:
 
-Methods:
+```text
+WAITING_FOR_ROLL
+-> rollDice
+-> TILE_EFFECT
+-> applyTileEffect
+-> WAITING_FOR_ROLL, ROUND_END, MICRO_GAME, or FINISHED
+```
 
-- `startMiniGame(Room, String)`: starts end-of-round mini game.
-- `submitMiniGameScore(Room, String, int)`: records mini game score.
-- `finishMiniGame(Room)`: ranks scores, applies rewards, advances round.
-- `requireMiniGame(Room)`: gets active mini game or throws.
-- `emptyToDefault(String, String)`: default helper for optional type names.
+Special tile behavior:
 
-### `socket-server/src/main/java/com/example/boardgame/server/service/MicroGameService.java`
+- `QUESTION_MARK`: random score change, then advance turn.
+- `CARD`: adds starter `DOUBLE_DICE`, then advance turn.
+- `GAME`: returns `TILE_GAME`; `GameSocketHandler` starts a micro game.
+- `NORMAL` / `START`: advance turn.
 
-Purpose:
+Validation:
 
-- Owns tile-triggered micro game flow.
+- Player must exist in the room.
+- Player must be current turn player for roll/tile effect.
+- Game phase must match the command.
 
-Fields:
+Change risk:
 
-- `MICRO_GAME_DURATION_MILLIS`: micro game duration.
-- `MICRO_GAME_SCORE_BY_RANK`: rewards for micro game rank.
-- `boardGameService`: shared board-state validation helper.
-- `scoreService`: ranking and reward helper.
+- Do not put final board rules into `GameSocketHandler`. This service is the rule boundary.
+- If cards become real mechanics, add explicit card state/rules instead of leaving string inventory behavior scattered.
 
-Methods:
+### `GameState`
 
-- `startMicroGame(Room, String, String)`: starts tile-triggered micro game.
-- `submitMicroGameScore(Room, String, int)`: records micro game score.
-- `finishMicroGame(Room)`: ranks scores, applies rewards, advances turn.
-- `requireMicroGame(Room)`: gets active micro game or throws.
-- `emptyToDefault(String, String)`: default helper for optional type names.
+Path:
 
-### `socket-server/src/main/java/com/example/boardgame/server/service/ScoreService.java`
+```text
+socket-server/src/main/java/com/example/boardgame/server/model/GameState.java
+```
 
-Purpose:
+Role:
 
-- Owns shared score ranking and reward application.
+- Tracks turn order, current round, current player index, phase, and last dice roll.
 
-Methods:
+Important behavior:
 
-- `rankScores(Map<String, Integer>, int[])`: converts raw scores into rewards.
-- `applyRewards(Room, Map<String, Integer>)`: adds rewards to players.
+- `advanceTurn` moves to the next player.
+- End of turn order moves to `ROUND_END`.
+- `advanceRound` starts the next round or finishes the game.
 
-## XML Layout
+Change risk:
 
-### `app/src/main/res/layout/activity_main.xml`
+- Keep phase transitions explicit. Most command validation depends on `turnPhase`.
 
-Purpose:
+## Mini/Micro Game Dictionary
 
-- Debug UI for LAN testing.
-- Uses plain Android views so the networking flow is easy to inspect.
+### `MiniGameService`
 
-Important views:
+Path:
 
-- `serverUrlInput`: WebSocket URL.
-- `nicknameInput`: player nickname.
-- `connectButton`, `disconnectButton`: socket connection controls.
-- `roomCodeInput`: room code for join/display.
-- Room buttons: create, join, matchmake, ready, unready, start.
-- Game buttons: roll, tile effect.
-- Mini/micro buttons: start/submit/finish test flows.
-- State text views: connection, player, room, game, log.
+```text
+socket-server/src/main/java/com/example/boardgame/server/service/MiniGameService.java
+```
+
+Role:
+
+- End-of-round mini game flow.
+
+Current flow:
+
+```text
+ROUND_END
+-> startMiniGame
+-> MINI_GAME
+-> submitMiniGameScore from players
+-> finishMiniGame
+-> rewards
+-> advanceRound
+```
+
+Rewards:
+
+```text
+rank 1: 30
+rank 2: 20
+rank 3: 10
+rank 4: 5
+```
+
+Change risk:
+
+- No timer enforcement exists yet. `durationMillis` is stored but not used to auto-finish.
+- Missing submissions are simply absent from the score map.
+
+### `MicroGameService`
+
+Path:
+
+```text
+socket-server/src/main/java/com/example/boardgame/server/service/MicroGameService.java
+```
+
+Role:
+
+- Tile-triggered quick game flow.
+
+Current flow:
+
+```text
+TILE_EFFECT on GAME tile
+-> startMicroGame
+-> MICRO_GAME
+-> submitMicroGameScore from players
+-> finishMicroGame
+-> rewards
+-> advanceTurn
+```
+
+Rewards:
+
+```text
+rank 1: 8
+rank 2: 5
+rank 3: 3
+rank 4: 1
+```
+
+Change risk:
+
+- Like mini games, timers are not enforced yet.
+- The trigger player is stored, but current scoring allows any room player to submit.
+
+### `ScoreService`
+
+Path:
+
+```text
+socket-server/src/main/java/com/example/boardgame/server/service/ScoreService.java
+```
+
+Role:
+
+- Shared score ranking and reward application.
+
+Important behavior:
+
+- Higher submitted score ranks first.
+- Reward array index maps to rank.
+- Rewards are applied to `Player.score`.
+
+Change risk:
+
+- Tie behavior is currently whatever the sort/order produces. Define explicit tie handling before final gameplay.
+
+## Tests Worth Reading
+
+These tests are more useful than most file summaries:
+
+- `FirebaseAdminAuthVerifierTest`: verifies token success/failure behavior without real Firebase.
+- `RoomServiceTest`: verifies duplicate UID prevention and room membership rules.
+- `SocketMessageTest`: verifies JSON wire serialization and simple field access.
+- `SnapshotMessageMapperTest`: verifies nested JSON room/game snapshot round trips.
+
+## Common Change Recipes
+
+### Add A New Client Command
+
+1. Add the string to `MessageTypes`.
+2. Add a method to `SocketRoomController`.
+3. Add a case in `GameSocketHandler.handleCommand`.
+4. Put rule logic in a service, not in the socket server.
+5. Decide whether the result is `roomOnly` or `roomAndGame`.
+6. Add tests at the service or protocol boundary.
+
+### Add A New Room Snapshot Field
+
+1. Add it to `RoomSnapshot` or `PlayerSnapshot`.
+2. Populate it in model `toSnapshot`.
+3. Add JSON encode/decode in `SnapshotMessageMapper`.
+4. Render it in `MainActivity` only if useful for debug.
+5. Add/update `SnapshotMessageMapperTest`.
+
+### Add A New Game Phase
+
+1. Add the phase constant to `GameState`.
+2. Decide which service transitions into and out of it.
+3. Add `requirePhase` checks for commands that only make sense in that phase.
+4. Make sure `publishGame` runs after commands that change the phase.
+
+### Add Real Reconnect
+
+Current disconnect removes a player immediately. Proper reconnect needs:
+
+- A server-issued resume token.
+- A grace period before `RoomService.disconnect` removes the player.
+- A way to bind a new `ClientSession` to the previous room/player.
+- Rules for what happens if the Firebase UID tries to join elsewhere during the grace period.

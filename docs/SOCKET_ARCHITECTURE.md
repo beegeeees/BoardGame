@@ -20,7 +20,20 @@ Firebase Auth identifies the user. The socket server owns live lobby, room, and 
 
 ## Current Protocol
 
-Messages are small form-encoded text fields. This keeps the scaffold dependency-free and easy to inspect. JSON is a good next step once messages become larger.
+Messages are JSON text frames. The envelope keeps command values and snapshot payloads under `fields`:
+
+```json
+{
+  "type": "CREATE_ROOM",
+  "requestId": "request-id",
+  "fields": {
+    "nickname": "Player",
+    "firebaseIdToken": "firebase-token"
+  }
+}
+```
+
+Room and game snapshots use nested JSON objects. For example, `ROOM_UPDATED` carries `fields.room.players` as an array of player objects, and `GAME_UPDATED` carries `fields.game.turnOrder` as an array of player IDs.
 
 Transport libraries:
 
@@ -57,8 +70,8 @@ Server messages:
 ```text
 REQUEST_OK      requestId roomCode playerId status
 REQUEST_ERROR   requestId errorCode details
-ROOM_UPDATED    roomCode hostPlayerId status players
-GAME_UPDATED    roomCode currentRound finalRound currentPlayerId lastDiceRoll turnPhase turnOrder
+ROOM_UPDATED    room
+GAME_UPDATED    game
 APP_PONG
 ```
 
