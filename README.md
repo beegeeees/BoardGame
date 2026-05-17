@@ -84,6 +84,14 @@ export FIREBASE_SERVICE_ACCOUNT=/absolute/path/to/service-account.json
 
 or configure `GOOGLE_APPLICATION_CREDENTIALS`.
 
+For local game-flow testing without Firebase Admin credentials, run the socket server with dev auth:
+
+```bash
+BOARDGAME_DEV_AUTH=true ./gradlew :socket-server:run
+```
+
+This bypasses Firebase token verification and is not safe for production.
+
 ## Docs
 
 - [Code Structure](docs/CODE_STRUCTURE.md)

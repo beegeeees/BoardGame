@@ -66,6 +66,7 @@ These files are simple enough that the important point is mostly where they fit.
 
 - `AuthException`: marks auth failures so `GameSocketHandler` can return `UNAUTHENTICATED` instead of a generic bad request.
 - `AuthVerifier`: injectable auth boundary. Production uses Firebase Admin; tests can pass a fake verifier.
+- `DevAuthVerifier`: local-only auth bypass used when `BOARDGAME_DEV_AUTH=true`.
 - `Player`: server-side player state. It includes Firebase UID, so only `toSnapshot()` output should be sent to clients.
 - `MiniGameState`: stores current mini-game type, timer metadata, status, and score submissions.
 - `MicroGameState`: stores tile-triggered micro-game metadata, trigger player, status, and score submissions.
@@ -386,6 +387,34 @@ Role:
 Change risk:
 
 - Keep the interface returning a trusted UID, not a client-provided identity.
+
+### `DevAuthVerifier`
+
+Path:
+
+```text
+socket-server/src/main/java/com/example/boardgame/server/DevAuthVerifier.java
+```
+
+Role:
+
+- Local development bypass for teams that need to test socket/game flow without sharing Firebase Admin credentials.
+
+Activation:
+
+```bash
+BOARDGAME_DEV_AUTH=true ./gradlew :socket-server:run
+```
+
+Important behavior:
+
+- If the client sends token text, that text is used as the dev UID.
+- If the token is empty, the verifier returns `dev-` plus the socket connection ID.
+
+Change risk:
+
+- This is not authentication. Never use it for production or security testing.
+- Because empty tokens become per-connection UIDs, reconnecting creates a different dev identity.
 
 ## Command Coordinator Dictionary
 

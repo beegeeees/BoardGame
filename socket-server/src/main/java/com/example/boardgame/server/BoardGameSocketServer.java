@@ -13,12 +13,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class BoardGameSocketServer extends WebSocketServer {
     private static final int DEFAULT_PORT = 8080;
+    private static final String DEV_AUTH_ENV = "BOARDGAME_DEV_AUTH";
 
     private final Map<WebSocket, ClientSession> sessions = new ConcurrentHashMap<>();
     private final GameSocketHandler gameSocketHandler;
 
     public BoardGameSocketServer(int port) {
-        this(port, new FirebaseAdminAuthVerifier());
+        this(port, createAuthVerifier());
     }
 
     BoardGameSocketServer(int port, AuthVerifier authVerifier) {
@@ -29,6 +30,14 @@ public class BoardGameSocketServer extends WebSocketServer {
     public static void main(String[] args) {
         int port = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
         new BoardGameSocketServer(port).start();
+    }
+
+    private static AuthVerifier createAuthVerifier() {
+        if ("true".equalsIgnoreCase(System.getenv(DEV_AUTH_ENV))) {
+            System.out.println("WARNING: BOARDGAME_DEV_AUTH=true. Firebase token verification is disabled.");
+            return new DevAuthVerifier();
+        }
+        return new FirebaseAdminAuthVerifier();
     }
 
     @Override
