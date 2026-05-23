@@ -13,6 +13,9 @@ public class GameSnapshot {
     private final String turnPhase;
     private final List<String> turnOrder;
 
+    // 추가된 메시지 필드
+    private final String lastSystemMessage;
+
     public GameSnapshot(
             String roomCode,
             int currentRound,
@@ -20,7 +23,8 @@ public class GameSnapshot {
             String currentPlayerId,
             int lastDiceRoll,
             String turnPhase,
-            List<String> turnOrder
+            List<String> turnOrder,
+            String lastSystemMessage // 파라미터 추가
     ) {
         this.roomCode = roomCode == null ? "" : roomCode;
         this.currentRound = currentRound;
@@ -29,33 +33,19 @@ public class GameSnapshot {
         this.lastDiceRoll = lastDiceRoll;
         this.turnPhase = turnPhase == null ? "" : turnPhase;
         this.turnOrder = new ArrayList<>(turnOrder == null ? Collections.emptyList() : turnOrder);
+        this.lastSystemMessage = lastSystemMessage == null ? "" : lastSystemMessage;
     }
 
-    public String getRoomCode() {
-        return roomCode;
-    }
-
-    public int getCurrentRound() {
-        return currentRound;
-    }
-
-    public int getFinalRound() {
-        return finalRound;
-    }
-
-    public String getCurrentPlayerId() {
-        return currentPlayerId;
-    }
-
-    public int getLastDiceRoll() {
-        return lastDiceRoll;
-    }
-
-    public String getTurnPhase() {
-        return turnPhase;
-    }
+    public String getRoomCode() { return roomCode; }
+    public int getCurrentRound() { return currentRound; }
+    public int getFinalRound() { return finalRound; }
+    public String getCurrentPlayerId() { return currentPlayerId; }
+    public int getLastDiceRoll() { return lastDiceRoll; }
+    public String getTurnPhase() { return turnPhase; }
 
     public List<String> getTurnOrder() {
         return Collections.unmodifiableList(turnOrder);
     }
+
+    public String getLastSystemMessage() { return lastSystemMessage; }
 }

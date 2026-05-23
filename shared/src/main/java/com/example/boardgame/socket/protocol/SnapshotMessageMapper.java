@@ -6,11 +6,15 @@ import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class SnapshotMessageMapper {
     private static final String FIELD_ROOM = "room";
     private static final String FIELD_GAME = "game";
+    private static final String FIELD_MINI_GAME = "miniGame";
+    private static final String FIELD_MICRO_GAME = "microGame";
 
     private SnapshotMessageMapper() {
     }
@@ -24,6 +28,18 @@ public final class SnapshotMessageMapper {
     public static SocketMessage gameUpdated(GameSnapshot snapshot) {
         return SocketMessage.builder(MessageTypes.GAME_UPDATED)
                 .put(FIELD_GAME, toJson(snapshot))
+                .build();
+    }
+
+    public static SocketMessage miniGameUpdated(MiniGameSnapshot snapshot) {
+        return SocketMessage.builder(MessageTypes.MINI_GAME_UPDATED)
+                .put(FIELD_MINI_GAME, toJson(snapshot))
+                .build();
+    }
+
+    public static SocketMessage microGameUpdated(MicroGameSnapshot snapshot) {
+        return SocketMessage.builder(MessageTypes.MICRO_GAME_UPDATED)
+                .put(FIELD_MICRO_GAME, toJson(snapshot))
                 .build();
     }
 
@@ -46,7 +62,31 @@ public final class SnapshotMessageMapper {
                 string(game, "currentPlayerId"),
                 integer(game, "lastDiceRoll", 0),
                 string(game, "turnPhase"),
-                strings(game.get("turnOrder"))
+                strings(game.get("turnOrder")),
+                string(game, "lastSystemMessage")
+        );
+    }
+
+    public static MiniGameSnapshot toMiniGameSnapshot(SocketMessage message) {
+        JsonObject json = message.getObject(FIELD_MINI_GAME);
+        return new MiniGameSnapshot(
+                string(json, "id"),
+                string(json, "type"),
+                string(json, "status"),
+                integer(json, "remainingTime", 0),
+                scores(json.get("scores"))
+        );
+    }
+
+    public static MicroGameSnapshot toMicroGameSnapshot(SocketMessage message) {
+        JsonObject json = message.getObject(FIELD_MICRO_GAME);
+        return new MicroGameSnapshot(
+                string(json, "id"),
+                string(json, "type"),
+                string(json, "triggerPlayerId"),
+                string(json, "status"),
+                integer(json, "remainingTime", 0),
+                scores(json.get("scores"))
         );
     }
 
@@ -72,6 +112,14 @@ public final class SnapshotMessageMapper {
         player.addProperty("position", snapshot.getPosition());
         player.addProperty("ready", snapshot.isReady());
         player.addProperty("host", snapshot.isHost());
+        player.addProperty("inMicroGame", snapshot.isInMicroGame());
+
+        JsonArray itemCards = new JsonArray();
+        for (String card : snapshot.getItemCards()) {
+            itemCards.add(card);
+        }
+        player.add("itemCards", itemCards);
+
         return player;
     }
 
@@ -89,7 +137,50 @@ public final class SnapshotMessageMapper {
             turnOrder.add(playerId);
         }
         game.add("turnOrder", turnOrder);
+        game.addProperty("lastSystemMessage", snapshot.getLastSystemMessage());
+
         return game;
+    }
+
+    private static JsonObject toJson(MiniGameSnapshot snapshot) {
+        JsonObject json = new JsonObject();
+        json.addProperty("id", snapshot.getId());
+        json.addProperty("type", snapshot.getType());
+        json.addProperty("status", snapshot.getStatus());
+        json.addProperty("remainingTime", snapshot.getRemainingTime());
+        json.add("scores", toJson(snapshot.getScores()));
+        return json;
+    }
+
+    private static JsonObject toJson(MicroGameSnapshot snapshot) {
+        JsonObject json = new JsonObject();
+        json.addProperty("id", snapshot.getId());
+        json.addProperty("type", snapshot.getType());
+        json.addProperty("triggerPlayerId", snapshot.getTriggerPlayerId());
+        json.addProperty("status", snapshot.getStatus());
+        json.addProperty("remainingTime", snapshot.getRemainingTime());
+        json.add("scores", toJson(snapshot.getScores()));
+        return json;
+    }
+
+    private static JsonObject toJson(Map<String, Integer> scores) {
+        JsonObject json = new JsonObject();
+        for (Map.Entry<String, Integer> entry : scores.entrySet()) {
+            json.addProperty(entry.getKey(), entry.getValue());
+        }
+        return json;
+    }
+
+    private static Map<String, Integer> scores(JsonElement element) {
+        if (element == null || !element.isJsonObject()) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> scores = new HashMap<>();
+        JsonObject object = element.getAsJsonObject();
+        for (String key : object.keySet()) {
+            scores.put(key, object.get(key).getAsInt());
+        }
+        return scores;
     }
 
     private static List<PlayerSnapshot> players(JsonElement element) {
@@ -108,7 +199,9 @@ public final class SnapshotMessageMapper {
                     integer(player, "score", 0),
                     integer(player, "position", 0),
                     bool(player, "ready", false),
-                    bool(player, "host", false)
+                    bool(player, "host", false),
+                    bool(player, "inMicroGame", false),
+                    strings(player.get("itemCards"))
             ));
         }
         return players;
