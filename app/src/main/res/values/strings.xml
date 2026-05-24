@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Title Demo</string>
+
+    <string name="title_screen_title">&#xBD88;&#xD3B8;&#xB9C8;&#xBD88; &#xBCF4;&#xB4DC;&#xD310;</string>
+    <string name="title_join_button">&#xAC8C;&#xC784; &#xCC38;&#xC5EC;\n(Room List)</string>
+    <string name="title_options_button">&#xC635;&#xC158;</string>
+    <string name="title_rules_button">Rules / How to play</string>
+    <string name="title_rules_title">Main Game Rules</string>
+    <string name="title_rules_text">1) &#xAC01; &#xD134;&#xC5D0; &#xC8FC;&#xC0AC;&#xC704;&#xB97C; &#xAD74;&#xB824; &#xCE78;&#xC744; &#xC774;&#xB3D9;&#xD569;&#xB2C8;&#xB2E4;.\n2) &#xC774;&#xB3D9; &#xD6C4; &#xCE78; &#xD6A8;&#xACFC; &#xBC0F; &#xBBF8;&#xB2C8;&#xAC8C;&#xC784; &#xACB0;&#xACFC;&#xAC00; &#xC801;&#xC6A9;&#xB429;&#xB2C8;&#xB2E4;.\n3) &#xB9C8;&#xC9C0;&#xB9C9; &#xAE4C;&#xC9C0; &#xB0A8;&#xC544; &#xC788;&#xB294; &#xD50C;&#xB808;&#xC774;&#xC5B4;&#xAC00; &#xC2B9;&#xB9AC;&#xD569;&#xB2C8;&#xB2E4;.\n(&#xC0C1;&#xC138; &#xB8F0;&#xC740; &#xCD94;&#xD6C4; &#xC790;&#xB8CC; &#xBC1B;&#xC740; &#xD6C4; &#xAD50;&#xCCB4; &#xC608;&#xC815;)</string>
+    <string name="rules_prev">이전</string>
+    <string name="rules_next">다음</string>
+    <string-array name="title_rules_pages">
+        <item>규칙 문서에서 추출한 내용을 여기에 넣을 예정입니다.\n\n현재는 페이지 UI만 우선 적용되어 있습니다.</item>
+        <item>문서 원문을 프로젝트 경로로 옮겨주시면,\n실제 룰 문장으로 교체해드릴게요.</item>
+    </string-array>
+    <string name="title_nickname_format">&#xB2C9;&#xB124;&#xC784;: %1$s</string>
+    <string-array name="title_rules_pages_v2">
+        <item>[1] 게임 소개\n불편마불은 2~4인이 함께 플레이하는 멀티플레이 보드게임입니다.\n플레이어는 보드판 이동과 미니게임 경쟁으로 점수를 얻고,\n총 3라운드 종료 후 최고 점수 플레이어가 승리합니다.</item>
+        <item>[2] 게임 진행 방식\n1. 플레이어 순서대로 턴 진행\n2. 모든 플레이어 턴 종료\n3. 미니게임 진행\n4. 점수 반영\n5. 다음 라운드 진행\n\n이 흐름을 3라운드 반복합니다.</item>
+        <item>[3] 플레이어 턴\n한 플레이어의 턴 순서:\n1) 카드 사용\n2) 주사위 굴리기\n3) 말 이동\n4) 칸 효과 적용\n5) 턴 종료</item>
+        <item>[4] 주사위 시스템\n주사위는 1~6 범위에서 나옵니다.\n버튼 선택으로 범위를 어느 정도 조절할 수 있습니다.\n- 1~2 버튼\n- 3~4 버튼\n- 5~6 버튼\n- 랜덤 버튼\n\n일정 확률로 버튼이 섞이거나 가려지는 UI 기믹이 등장합니다.</item>
+        <item>[5] 점수 규칙\n이동한 칸 수만큼 기본 점수를 얻습니다.\n예: 1칸=+1점, 6칸=+6점\n\n추가로 도착 칸 효과가 반영되며,\n점수는 음수가 될 수 있습니다.</item>
+        <item>[6] 보드판 구성\n보드판은 총 16칸입니다.\n\n칸 종류:\n- 시작 칸(도착 시 +5)\n- 점수 칸(+3)\n- 감점 칸(-3)\n- 물음표 칸(랜덤 이벤트)\n- 카드 칸(카드 1장 획득)\n- 광고 칸(짧은 미니게임)</item>
+        <item>[7] 물음표/광고 칸\n물음표 칸 예시 이벤트:\n- 점수 교환\n- 위치 교환\n- 다음 주사위 강화\n- 전체 플레이어 점수 변화\n\n광고 칸:\n- 성공 시 +5점\n- 실패 시 -5점</item>
+        <item>[8] 카드 종류\n- 방어권 카드: 다음 감점 효과 방어\n- 10 주사위 카드: 주사위 범위 1~10\n- 456 주사위 카드: 4~6만 등장\n- 홀짝 주사위 카드: 홀수/짝수 강제\n- 광고 스킵 카드: 광고 칸 건너뜀</item>
+        <item>[9] 미니게임\n모든 플레이어 턴이 끝나면 미니게임이 시작됩니다.\n종류:\n1) 색상 캡챠\n2) 비밀번호 생성\n3) 볼륨 미로</item>
+        <item>[10] 미니게임 점수\n순위별 점수:\n1위 +10\n2위 +7\n3위 +5\n4위 +3\n실패 0</item>
+        <item>[11] 승리 조건\n3라운드 종료 후 최고 점수 플레이어 승리.\n동점일 경우:\n1) 미니게임 1위 횟수\n2) 평균 미니게임 순위\n3) 마지막 미니게임 순위\n그래도 같으면 공동 승리</item>
+        <item>[12] 게임 특징\n- 불편한 UI 기믹\n- 빠른 멀티플레이 진행\n- 카드 + 랜덤 이벤트 중심\n- 미니게임 경쟁 요소\n- 점수 기반 승리 시스템</item>
+    </string-array>
+
+    <string name="nickname_splash_title">&#xB2C9;&#xB124;&#xC784; &#xC124;&#xC815;</string>
+    <string name="nickname_splash_subtitle">Moving to the nickname screen...</string>
+
+    <string name="nickname_title">&#xB2C9;&#xB124;&#xC784; &#xC124;&#xC815;</string>
+    <string name="nickname_guide">Set once, then return to title screen.</string>
+    <string name="nickname_hint">&#xB2C9;&#xB124;&#xC784;&#xC744; &#xC785;&#xB825;&#xD558;&#xC138;&#xC694;</string>
+    <string name="nickname_save_button">Save and return</string>
+    <string name="error_nickname_required">&#xB2C9;&#xB124;&#xC784;&#xC744; &#xC785;&#xB825;&#xD574; &#xC8FC;&#xC138;&#xC694;.</string>
+
+    <string name="lobby_list_create">&#xBC29; &#xC0DD;&#xC131;</string>
+    <string name="lobby_list_refresh">&#xC0C8;&#xB85C;&#xACE0;&#xCE68;</string>
+    <string name="lobby_list_back_title">&#xB098;&#xAC00;&#xAE30;</string>
+    <string name="lobby_list_code_hint">&#xBC29; &#xCF54;&#xB4DC; &#xC785;&#xB825; (&#xC608; 111111)</string>
+    <string name="lobby_list_join_code">&#xCF54;&#xB4DC; &#xC785;&#xC7A5;</string>
+    <string name="lobby_list_code_required">&#xBC29; &#xCF54;&#xB4DC;&#xB97C; &#xC785;&#xB825;&#xD558;&#xC138;&#xC694;.</string>
+    <string name="lobby_list_code_not_found">&#xD574;&#xB2F9; &#xCF54;&#xB4DC;&#xC758; &#xBC29;&#xC744; &#xCC3E;&#xC744; &#xC218; &#xC5C6;&#xC2B5;&#xB2C8;&#xB2E4;.</string>
+    <string name="room_host_format">&#xBC29;&#xC7A5;: %1$s</string>
+    <string name="room_count_format">&#xC778;&#xC6D0; %1$d/%2$d</string>
+
+    <string name="lobby_header">&#xB300;&#xAE30;&#xBC29;</string>
+    <string name="lobby_room_code">&#xBC29; &#xCF54;&#xB4DC;: %1$s</string>
+    <string name="lobby_room_meta">&#xC778;&#xC6D0; %1$d/%2$d &#x2022; &#xC900;&#xBE44; %3$d&#xBA85;</string>
+    <string name="lobby_slot_host_format">[&#xBC29;&#xC7A5;] %1$s</string>
+    <string name="lobby_slot_waiting_name">&#xC785;&#xC7A5; &#xB300;&#xAE30;...</string>
+    <string name="lobby_status_waiting">&#xC785;&#xC7A5; &#xB300;&#xAE30;</string>
+    <string name="lobby_status_ready">&#xC900;&#xBE44;&#xC644;&#xB8CC;</string>
+    <string name="lobby_start_button">&#xC2DC;&#xC791;</string>
+    <string name="lobby_start_loading">Moving to board...</string>
+    <string name="lobby_start_hint_ready">&#xBC29;&#xC7A5;&#xC774; &#xC2DC;&#xC791; &#xBC84;&#xD2BC;&#xC744; &#xB204;&#xB974;&#xBA74; &#xAC8C;&#xC784;&#xC744; &#xC2DC;&#xC791;&#xD569;&#xB2C8;&#xB2E4;.</string>
+    <string name="lobby_start_hint_loading">&#xD50C;&#xB808;&#xC774;&#xC5B4; &#xC785;&#xC7A5; &#xC644;&#xB8CC;. &#xBCF4;&#xB4DC;&#xD310;&#xC73C;&#xB85C; &#xC774;&#xB3D9;&#xD569;&#xB2C8;&#xB2E4;.</string>
+    <string name="lobby_start_hint_need_all_ready">&#xBAA8;&#xB4E0; &#xCC38;&#xC5EC;&#xC790;&#xAC00; &#xC900;&#xBE44; &#xC644;&#xB8CC;&#xD558;&#xBA74; &#xBC29;&#xC7A5;&#xC774; &#xC2DC;&#xC791;&#xD569;&#xB2C8;&#xB2E4;.</string>
+    <string name="lobby_start_hint_host_only">&#xBC29;&#xC7A5;&#xB9CC; &#xAC8C;&#xC784; &#xC2DC;&#xC791; &#xAC00;&#xB2A5;</string>
+    <string name="lobby_leave_button">&#xBC29; &#xB098;&#xAC00;&#xAE30;</string>
+    <string name="lobby_room_join">&#xC785;&#xC7A5;</string>
+
+    <string name="board_screen_title">&#xBD88;&#xD3B8;&#xB9C8;&#xBD88; &#xBCF4;&#xB4DC;&#xD310;</string>
+    <string name="board_demo_title">&#xBCF4;&#xB4DC; &#xD654;&#xBA74;</string>
+    <string name="board_participants_title">&#xCC38;&#xC5EC; &#xD50C;&#xB808;&#xC774;&#xC5B4;</string>
+    <string name="board_start_countdown">%1$d&#xCD08; &#xB4A4; &#xAC8C;&#xC784;&#xC774; &#xC2DC;&#xC791;&#xB429;&#xB2C8;&#xB2E4;...</string>
+    <string name="board_start_now">&#xAC8C;&#xC784; &#xC2DC;&#xC791;</string>
+    <string name="minigame3_title">&#xBBF8;&#xB2C8;&#xAC8C;&#xC784; 3: &#xBCFC;&#xB968; &#xBBF8;&#xB85C;</string>
+    <string name="minigame3_status_ingame">&#xBCFC;&#xB968;&#xC744; 100&#xC73C;&#xB85C; &#xB9DE;&#xCD94;&#xC138;&#xC694;.</string>
+    <string name="minigame3_status_clear">&#xD074;&#xB9AC;&#xC5B4;! &#xBCFC;&#xB968; 100 &#xB2EC;&#xC131;</string>
+    <string name="minigame3_toast_clear">&#xBBF8;&#xB2C8;&#xAC8C;&#xC784; 3 &#xD074;&#xB9AC;&#xC5B4;</string>
+    <string name="minigame3_intro_title">&#xBBF8;&#xB2C8;&#xAC8C;&#xC784; 3</string>
+    <string name="minigame3_intro_name">&#xBCFC;&#xB968; &#xBBF8;&#xB85C;</string>
+    <string name="minigame3_intro_desc_1">&#xAE30;&#xC6B8;&#xAE30;&#xB85C; &#xC790;&#xC11D;&#xC744; &#xC6C0;&#xC9C1;&#xC5EC;\n&#xAD6C;&#xC2AC;&#xC744; &#xC720;&#xB3C4;&#xD558;&#xC138;&#xC694;!</string>
+    <string name="minigame3_intro_desc_2">&#xAD6C;&#xC2AC; X&#xCD95; &#xC704;&#xCE58;&#xAC00;\n&#xBCFC;&#xB968; &#xBC14;&#xC640; &#xB3D9;&#xAE30;&#xD654;&#xB429;&#xB2C8;&#xB2E4;.</string>
+    <string name="minigame3_intro_warn">&#x26A0; &#xC2A4;&#xB9C8;&#xD2B8;&#xD3F0;&#xC744; &#xC138;&#xB85C;&#xB85C; &#xB4E4;&#xC5B4;&#xC8FC;&#xC138;&#xC694;!</string>
+    <string name="minigame3_reset">&#xCD08;&#xAE30;&#xD654;</string>
+
+    <string name="options_title">&#xC635;&#xC158;</string>
+    <string name="options_volume_title">&#xBCFC;&#xB968; &#xC870;&#xC808;</string>
+    <string name="options_volume_value">VOL %1$d</string>
+    <string name="options_sound_effects">Sound effects</string>
+    <string name="options_vibration">Vibration</string>
+    <string name="options_dice_speed_normal">Dice: Normal</string>
+    <string name="options_dice_speed_fast">Dice: Fast</string>
+    <string name="options_debug_mode">Debug mode (로컬 임시방 허용)</string>
+    <string name="options_server_url">Server WebSocket URL</string>
+    <string name="options_server_url_hint">ws://10.0.2.2:8080/game</string>
+    <string name="options_server_url_save">주소 저장</string>
+    <string name="options_server_url_saved">서버 주소가 저장되었습니다.</string>
+    <string name="options_server_url_invalid">ws:// 또는 wss:// 로 시작해야 합니다.</string>
+    <string name="options_easy_volume_label">&#xB354; &#xD3B8;&#xD55C; &#xBCFC;&#xB968; &#xC870;&#xC808;</string>
+    <string name="options_easy_volume_locked">&#xAC8C;&#xC784;&#xC5D0;&#xC11C; 1&#xD68C; &#xC774;&#xC0C1; &#xC6B0;&#xC2B9;&#xD55C; &#xB4A4; &#xC0AC;&#xC6A9;&#xD560; &#xC218; &#xC788;&#xC2B5;&#xB2C8;&#xB2E4;...</string>
+    <string name="options_close_button">&#xB2EB;&#xAE30;</string>
+</resources>
