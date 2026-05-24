@@ -9,20 +9,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BoardGameService {
-    public static final int BOARD_SIZE = 16;
-    public static final int FINAL_ROUND = 3;
+    public static final int BOARD_SIZE = 16; // 기획서 기준 16칸
+    public static final int FINAL_ROUND = 3; // 기획서 기준 3라운드
 
+    // 타일 종류 상수 정의 (기획서 매핑용)
     public static final String TILE_START = "START";
-    public static final String TILE_NORMAL = "NORMAL";
-    public static final String TILE_QUESTION_MARK = "QUESTION_MARK";
+    public static final String TILE_PLUS_SCORE = "PLUS_SCORE";
+    public static final String TILE_MINUS_SCORE = "MINUS_SCORE";
     public static final String TILE_CARD = "CARD";
-    public static final String TILE_GAME = "GAME";
+    public static final String TILE_QUESTION = "QUESTION";
+    public static final String TILE_AD = "AD"; // 마이크로 게임(광고) 트리거
+    public static final String TILE_NORMAL = "NORMAL"; // ⚠️ [수정] 누락된 상수 추가
+
+    // 카드 종류 상수
+    public static final String CARD_DEFENSE = "DEFENSE_CARD";
 
     private final SecureRandom random = new SecureRandom();
 
     public void startGame(Room room) {
-        if (!room.canStart(RoomService.MIN_PLAYERS)) {
-            throw new IllegalStateException("At least one ready player is required to start");
+        if (!room.canStart(2)) {
+            throw new IllegalStateException("At least enough ready players are required to start");
         }
 
         GameState gameState = new GameState(room.getCode(), FINAL_ROUND);
@@ -41,32 +47,76 @@ public class BoardGameService {
         requirePhase(gameState, GameState.WAITING_FOR_ROLL);
 
         Player player = requirePlayer(room, playerId);
+
         int diceRoll = 1 + random.nextInt(6);
         player.moveBy(diceRoll, BOARD_SIZE);
+        player.addScore(diceRoll);
+
         gameState.setLastDiceRoll(diceRoll);
-        gameState.setTurnPhase(GameState.TILE_EFFECT);
+        gameState.setTurnPhase(GameState.TILE_EFFECT_APPLIED);
         room.touch();
+
         return diceRoll;
     }
 
     public String applyTileEffect(Room room, String playerId) {
         GameState gameState = requireGameState(room);
         requireCurrentPlayer(gameState, playerId);
-        requirePhase(gameState, GameState.TILE_EFFECT);
+        requirePhase(gameState, GameState.TILE_EFFECT_APPLIED);
 
         Player player = requirePlayer(room, playerId);
         String tileType = getTileType(player.getPosition());
-        if (TILE_QUESTION_MARK.equals(tileType)) {
-            player.addScore(random.nextBoolean() ? 10 : -5);
-            gameState.advanceTurn();
-        } else if (TILE_CARD.equals(tileType)) {
-            player.addItemCard("DOUBLE_DICE");
-            gameState.advanceTurn();
-        } else if (!TILE_GAME.equals(tileType)) {
-            gameState.advanceTurn();
+
+        switch (tileType) {
+            case TILE_START:
+                player.addScore(5);
+                gameState.advanceTurn();
+                break;
+            case TILE_PLUS_SCORE:
+                player.addScore(3);
+                gameState.advanceTurn();
+                break;
+            case TILE_MINUS_SCORE:
+                if (player.hasItemCard(CARD_DEFENSE)) {
+                    player.useItemCard(CARD_DEFENSE);
+                } else {
+                    player.addScore(-3);
+                }
+                gameState.advanceTurn();
+                break;
+            case TILE_CARD:
+                player.addItemCard(CARD_DEFENSE);
+                gameState.advanceTurn();
+                break;
+            case TILE_QUESTION:
+                int randomScore = random.nextBoolean() ? 5 : -5;
+                player.addScore(randomScore);
+                gameState.advanceTurn();
+                break;
+            case TILE_AD:
+                player.setInMicroGame(true);
+                gameState.setTurnPhase(GameState.WAITING_FOR_MICRO_GAME);
+                break;
+            default:
+                gameState.advanceTurn();
+                break;
         }
+
         room.touch();
         return tileType;
+    }
+
+    public String getTileType(int position) {
+        // ⚠️ [수정] Enhanced switch를 사용하여 가독성을 높이고 TILE_NORMAL 반환 에러 해결
+        return switch (position) {
+            case 0 -> TILE_START;
+            case 1, 3, 5, 11, 15 -> TILE_PLUS_SCORE;
+            case 7, 9, 13 -> TILE_MINUS_SCORE;
+            case 2, 10 -> TILE_CARD;
+            case 4, 8, 12 -> TILE_QUESTION;
+            case 6, 14 -> TILE_AD;
+            default -> TILE_NORMAL;
+        };
     }
 
     public GameState requireGameState(Room room) {
@@ -89,22 +139,6 @@ public class BoardGameService {
         if (!expectedPhase.equals(gameState.getTurnPhase())) {
             throw new IllegalStateException("Current phase is not " + expectedPhase);
         }
-    }
-
-    public String getTileType(int position) {
-        if (position == 0) {
-            return TILE_START;
-        }
-        if (position % 8 == 0) {
-            return TILE_GAME;
-        }
-        if (position % 6 == 0) {
-            return TILE_CARD;
-        }
-        if (position % 5 == 0) {
-            return TILE_QUESTION_MARK;
-        }
-        return TILE_NORMAL;
     }
 
     private void requireCurrentPlayer(GameState gameState, String playerId) {

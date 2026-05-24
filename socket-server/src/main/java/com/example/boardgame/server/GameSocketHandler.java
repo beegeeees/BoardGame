@@ -59,34 +59,21 @@ public class GameSocketHandler {
     }
 
     private Result handleCommand(ClientSession session, SocketMessage message) {
-        switch (message.getType()) {
-            case MessageTypes.CREATE_ROOM:
-                return createRoom(session, message);
-            case MessageTypes.JOIN_ROOM:
-                return joinRoom(session, message);
-            case MessageTypes.MATCHMAKE:
-                return matchmake(session, message);
-            case MessageTypes.SET_READY:
-                return setReady(session, message);
-            case MessageTypes.START_GAME:
-                return startGame(session);
-            case MessageTypes.ROLL_DICE:
-                return rollDice(session);
-            case MessageTypes.APPLY_TILE_EFFECT:
-                return applyTileEffect(session);
-            case MessageTypes.START_MINI_GAME:
-                return startMiniGame(session, message);
-            case MessageTypes.SUBMIT_MINI_GAME_SCORE:
-                return submitMiniGameScore(session, message);
-            case MessageTypes.FINISH_MINI_GAME:
-                return finishMiniGame(session);
-            case MessageTypes.SUBMIT_MICRO_GAME_SCORE:
-                return submitMicroGameScore(session, message);
-            case MessageTypes.FINISH_MICRO_GAME:
-                return finishMicroGame(session);
-            default:
-                throw new IllegalArgumentException("Unsupported type: " + message.getType());
-        }
+        return switch (message.getType()) {
+            case MessageTypes.CREATE_ROOM -> createRoom(session, message);
+            case MessageTypes.JOIN_ROOM -> joinRoom(session, message);
+            case MessageTypes.MATCHMAKE -> matchmake(session, message);
+            case MessageTypes.SET_READY -> setReady(session, message);
+            case MessageTypes.START_GAME -> startGame(session);
+            case MessageTypes.ROLL_DICE -> rollDice(session);
+            case MessageTypes.APPLY_TILE_EFFECT -> applyTileEffect(session);
+            case MessageTypes.START_MINI_GAME -> startMiniGame(session, message);
+            case MessageTypes.SUBMIT_MINI_GAME_SCORE -> submitMiniGameScore(session, message);
+            case MessageTypes.FINISH_MINI_GAME -> finishMiniGame(session);
+            case MessageTypes.SUBMIT_MICRO_GAME_SCORE -> submitMicroGameScore(session, message);
+            case MessageTypes.FINISH_MICRO_GAME -> finishMicroGame(session);
+            default -> throw new IllegalArgumentException("Unsupported type: " + message.getType());
+        };
     }
 
     private Result createRoom(ClientSession session, SocketMessage message) {
@@ -141,7 +128,7 @@ public class GameSocketHandler {
     private Result applyTileEffect(ClientSession session) {
         Room room = requireBoundRoom(session);
         String tileType = boardGameService.applyTileEffect(room, session.getPlayerId());
-        if (BoardGameService.TILE_GAME.equals(tileType)) {
+        if (BoardGameService.TILE_AD.equals(tileType)) {
             microGameService.startMicroGame(room, session.getPlayerId(), "QUICK_TAP");
         }
         return Result.roomAndGame(room, roomService.requirePlayer(room, session.getPlayerId()));
@@ -150,13 +137,19 @@ public class GameSocketHandler {
     private Result startMiniGame(ClientSession session, SocketMessage message) {
         Room room = requireBoundRoom(session);
         roomService.requireHost(room, session.getPlayerId());
-        miniGameService.startMiniGame(room, message.getOrDefault("miniGameType", ""));
+        miniGameService.startMiniGame(room);
         return Result.roomAndGame(room, roomService.requirePlayer(room, session.getPlayerId()));
     }
 
     private Result submitMiniGameScore(ClientSession session, SocketMessage message) {
         Room room = requireBoundRoom(session);
-        miniGameService.submitMiniGameScore(room, session.getPlayerId(), message.getInt("score", 0));
+        miniGameService.submitMiniGameResult(
+                room,
+                session.getPlayerId(),
+                message.getOrDefault("state", "CLEAR"),
+                message.getInt("progress", 0),
+                message.getInt("completionTime", 0)
+        );
         return Result.roomAndGame(room, roomService.requirePlayer(room, session.getPlayerId()));
     }
 

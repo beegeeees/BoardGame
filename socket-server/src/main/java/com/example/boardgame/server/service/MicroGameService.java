@@ -22,7 +22,9 @@ public class MicroGameService {
     public MicroGameState startMicroGame(Room room, String triggerPlayerId, String type) {
         boardGameService.requirePlayer(room, triggerPlayerId);
         GameState gameState = boardGameService.requireGameState(room);
-        boardGameService.requirePhase(gameState, GameState.TILE_EFFECT);
+        
+        // ⚠️ [수정] GameState에 정의된 정확한 상수명으로 변경
+        boardGameService.requirePhase(gameState, GameState.TILE_EFFECT_APPLIED);
 
         MicroGameState microGameState = new MicroGameState(
                 UUID.randomUUID().toString(),
@@ -32,7 +34,10 @@ public class MicroGameService {
                 MICRO_GAME_DURATION_MILLIS
         );
         room.setMicroGameState(microGameState);
-        gameState.setTurnPhase(GameState.MICRO_GAME);
+        
+        // ⚠️ [수정] GameState에 정의된 정확한 상수명으로 변경
+        gameState.setTurnPhase(GameState.WAITING_FOR_MICRO_GAME);
+        
         room.touch();
         return microGameState;
     }
@@ -51,6 +56,8 @@ public class MicroGameService {
                 MICRO_GAME_SCORE_BY_RANK
         );
         scoreService.applyRewards(room, rewards);
+        
+        // 마이크로 게임 종료 후 다음 턴으로 진행
         boardGameService.requireGameState(room).advanceTurn();
         room.touch();
         return rewards;
