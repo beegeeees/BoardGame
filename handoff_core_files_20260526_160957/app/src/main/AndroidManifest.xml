@@ -11,27 +11,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.BulpyeonMabul">
-        <activity
-            android:name=".VolumeMazeActivity"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".AdGame3Activity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".AdGame2Activity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".AdGame1Activity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".PasswordActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
-        <activity
-            android:name=".DiceActivity"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name=".CaptchaActivity"
-            android:screenOrientation="portrait" />
+        <activity android:name=".CaptchaActivity" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

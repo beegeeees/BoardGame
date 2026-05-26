@@ -1,3 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="board_green">#2E7D32</color> <color name="tile_beige">#F5F5DC</color>  <color name="tile_border">#000000</color> </resources>
+    <color name="board_green">#2E7D32</color>
+    <color name="tile_beige">#F5F5DC</color>
+    <color name="tile_border">#000000</color>
+    <color name="waiting_text_primary">#1F2A3D</color>
+    <color name="waiting_text_secondary">#5C6B7A</color>
+    <color name="title_blue">#2C6FE1</color>
+</resources>

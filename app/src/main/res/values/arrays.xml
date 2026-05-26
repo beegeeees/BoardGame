@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="golden_keys">
+        <item>방어권 카드</item>
+        <item>10 주사위 카드</item>
+        <item>456 주사위 카드</item>
+        <item>주사위 홀짝 카드</item>
+        <item>광고 스킵 카드</item>
+    </string-array>
+
+    <string-array name="random_events">
+        <item>1등과 점수 교환!</item>
+        <item>꼴등과 점수 교환! (눈물)</item>
+        <item>랜덤 플레이어와 위치 교환!</item>
+        <item>다음 주사위 값 2배 버프!</item>
+        <item>다음 주사위 값 절반 디버프! (올림)</item>
+        <item>불편 마블 보너스! 점수 +7</item>
+        <item>갑자기 분위기 싸해짐... 점수 -7</item>
+        <item>기적의 주식 대박! 모든 플레이어 점수 2배</item>
+        <item>상장 폐지 엔딩... 모든 플레이어 점수 절반 (올림)</item>
+        <item>팀킬 발동! 자신을 제외한 모든 플레이어 점수 -3</item>
+    </string-array>
+</resources>
