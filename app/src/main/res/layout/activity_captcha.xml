@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#222222"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/txtStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="단계: 1 / 5"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:layout_marginBottom="10dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="다른 색깔의 칸을 하나 찾으세요!"
+        android:textColor="#AAAAAA"
+        android:layout_marginBottom="20dp"/>
+
+    <GridLayout
+        android:id="@+id/captchaGrid"
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:columnCount="5"
+        android:rowCount="5"
+        android:layout_gravity="center">
+    </GridLayout>
+
+</LinearLayout>
