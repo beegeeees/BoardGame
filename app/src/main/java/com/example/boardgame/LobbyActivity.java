@@ -47,6 +47,8 @@ public class LobbyActivity extends AppCompatActivity {
     private View slotRow1Gap;
     private View slotRow2Gap;
 
+    private final String[] slotPlayerIds = new String[4];
+
     private final ServerSession.Listener serverListener = new ServerSession.Listener() {
         @Override
         public void onConnectionStateChanged(ConnectionState state) {
@@ -190,16 +192,79 @@ public class LobbyActivity extends AppCompatActivity {
     }
 
     private void renderRoomSnapshot(RoomSnapshot room) {
-        List<PlayerSlot> slots = new ArrayList<>();
-        for (PlayerSnapshot player : room.getPlayers()) {
-            slots.add(new PlayerSlot(player.getNickname(), player.isHost(), player.isReady(), player.getId()));
+        List<PlayerSnapshot> players = room.getPlayers();
+        for (int i = 0; i < 4; i++) {
+            if (slotPlayerIds[i] != null) {
+                boolean stillPresent = false;
+                for (PlayerSnapshot p : players) {
+                    if (p.getId().equals(slotPlayerIds[i])) {
+                        stillPresent = true;
+                        break;
+                    }
+                }
+                if (!stillPresent) {
+                    slotPlayerIds[i] = null;
+                }
+            }
         }
-        while (slots.size() < 4) {
-            slots.add(PlayerSlot.empty());
+        for (PlayerSnapshot p : players) {
+            int existingSlot = -1;
+            for (int i = 0; i < 4; i++) {
+                if (p.getId().equals(slotPlayerIds[i])) {
+                    existingSlot = i;
+                    break;
+                }
+            }
+            if (existingSlot == -1) {
+                if (p.isHost() && slotPlayerIds[0] == null) {
+                    slotPlayerIds[0] = p.getId();
+                } else {
+                    for (int i = 0; i < 4; i++) {
+                        if (slotPlayerIds[i] == null) {
+                            slotPlayerIds[i] = p.getId();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        List<PlayerSlot> slots = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            String pid = slotPlayerIds[i];
+            if (pid == null) {
+                slots.add(PlayerSlot.empty());
+            } else {
+                PlayerSnapshot match = null;
+                for (PlayerSnapshot p : players) {
+                    if (p.getId().equals(pid)) {
+                        match = p;
+                        break;
+                    }
+                }
+                if (match != null) {
+                    slots.add(new PlayerSlot(match.getNickname(), match.isHost(), match.isReady(), match.getId()));
+                } else {
+                    slots.add(PlayerSlot.empty());
+                }
+            }
         }
         renderSlots(slots);
         updateRoomMeta(room);
         updateStartButtonState(false, room);
+
+        int mySlotIndex = -1;
+        String myId = ServerSession.getCurrentPlayerId();
+        for (int i = 0; i < 4; i++) {
+            if (myId.equals(slotPlayerIds[i])) {
+                mySlotIndex = i;
+                break;
+            }
+        }
+        if (mySlotIndex != -1) {
+            roomCodeText.setText(getString(R.string.lobby_room_code, roomCode) + " [" + (mySlotIndex + 1) + "P]");
+        } else {
+            roomCodeText.setText(getString(R.string.lobby_room_code, roomCode));
+        }
     }
 
     private void renderEmptyRoom() {
@@ -211,6 +276,7 @@ public class LobbyActivity extends AppCompatActivity {
         roomMetaText.setText(getString(R.string.lobby_room_meta, 0, 4, 0));
         startButton.setEnabled(false);
         renderStartButtonVisualState(false, false);
+        roomCodeText.setText(getString(R.string.lobby_room_code, roomCode));
     }
 
     private void renderSlots(List<PlayerSlot> slots) {
@@ -222,7 +288,7 @@ public class LobbyActivity extends AppCompatActivity {
             cardView.setVisibility(View.VISIBLE);
             boolean occupied = !slot.nickname.isEmpty();
             if (!occupied) {
-                nameView.setText("");
+                nameView.setText("(비어 있음)");
                 stateView.setVisibility(View.GONE);
                 stateView.setOnClickListener(null);
                 cardView.setAlpha(0.45f);
@@ -232,14 +298,18 @@ public class LobbyActivity extends AppCompatActivity {
             }
 
             stateView.setVisibility(View.VISIBLE);
+            String displayName = slot.nickname;
             if (slot.host) {
-                nameView.setText(getString(R.string.lobby_slot_host_format, slot.nickname));
-            } else {
-                nameView.setText(slot.nickname);
+                displayName = "👑 " + displayName;
             }
+            if (!slot.playerId.isEmpty() && slot.playerId.equals(ServerSession.getCurrentPlayerId())) {
+                displayName = displayName + " [나]";
+            }
+            nameView.setText(displayName);
 
             stateView.setText(getString(slot.ready ? R.string.lobby_status_ready : R.string.lobby_status_waiting));
             stateView.setBackgroundResource(slot.ready ? R.drawable.bg_status_ready : R.drawable.bg_status_waiting);
+            stateView.setTextColor(android.graphics.Color.parseColor(slot.ready ? "#2E7D32" : "#C62828"));
             if (!slot.playerId.isEmpty() && slot.playerId.equals(ServerSession.getCurrentPlayerId())) {
                 stateView.setOnClickListener(view -> toggleMyReady());
             } else {

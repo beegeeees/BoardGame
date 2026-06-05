@@ -194,7 +194,8 @@ public class LobbyListActivity extends AppCompatActivity {
     private void showJoinByCodeDialog() {
         EditText codeInput = newDialogEditText(getString(R.string.lobby_list_code_hint));
         codeInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
-        EditText passwordInput = newDialogEditText(getString(R.string.lobby_list_password_hint));
+
+        EditText passwordInput = newDialogEditText("비밀번호 입력");
         passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
 
         LinearLayout container = dialogContainer(codeInput, passwordInput);
@@ -227,7 +228,7 @@ public class LobbyListActivity extends AppCompatActivity {
         EditText passwordInput = null;
         LinearLayout container;
         if (room.hasPassword) {
-            passwordInput = newDialogEditText(getString(R.string.lobby_list_password_hint));
+            passwordInput = newDialogEditText("비밀번호 입력");
             passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
             container = dialogContainer(codeText, passwordInput);
         } else {

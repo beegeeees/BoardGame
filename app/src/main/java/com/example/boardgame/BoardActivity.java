@@ -116,6 +116,7 @@ public class BoardActivity extends AppCompatActivity {
         createScorePanels();
         btnDice.setOnClickListener(view -> {
             btnDice.setEnabled(false);
+            btnDice.setAlpha(0.40f);
             diceLauncher.launch(new Intent(this, DiceActivity.class));
         });
 
@@ -169,7 +170,7 @@ public class BoardActivity extends AppCompatActivity {
             boolean success = result.getResultCode() == RESULT_OK
                     && result.getData() != null
                     && result.getData().getBooleanExtra(GameContract.EXTRA_SUCCESS, false);
-            ServerSession.submitMicroGameScore(success ? MICRO_GAME_SUCCESS_SCORE : 0);
+            ServerSession.submitMicroGameScore(success ? MICRO_GAME_SUCCESS_SCORE : -5);
         });
 
         miniGameLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -196,6 +197,7 @@ public class BoardActivity extends AppCompatActivity {
         if (room == null) {
             txtTurnInfo.setText("게임 정보를 기다리는 중");
             btnDice.setEnabled(false);
+            btnDice.setAlpha(0.40f);
             return;
         }
 
@@ -219,15 +221,20 @@ public class BoardActivity extends AppCompatActivity {
             txtDiceVisual.setText("?");
             txtTurnInfo.setText("게임 시작 대기 중");
             btnDice.setEnabled(false);
+            btnDice.setAlpha(0.40f);
             return;
         }
 
         txtDiceVisual.setText(game.getLastDiceRoll() > 0 ? String.valueOf(game.getLastDiceRoll()) : "?");
         txtTurnInfo.setText(turnText(room, game));
-        btnDice.setEnabled(isMyTurn(game) && "WAITING_FOR_ROLL".equals(game.getTurnPhase()));
+
+        boolean isDiceEnabled = isMyTurn(game) && "WAITING_FOR_ROLL".equals(game.getTurnPhase());
+        btnDice.setEnabled(isDiceEnabled);
+        btnDice.setAlpha(isDiceEnabled ? 1.0f : 0.40f);
 
         if ("FINISHED".equals(game.getTurnPhase())) {
             btnDice.setEnabled(false);
+            btnDice.setAlpha(0.40f);
             showFinalRanking(room);
         }
     }
@@ -252,7 +259,15 @@ public class BoardActivity extends AppCompatActivity {
             String key = game.getCurrentRound() + ":" + game.getCurrentPlayerId() + ":" + game.getLastDiceRoll();
             if (!key.equals(launchedMicroGameKey)) {
                 launchedMicroGameKey = key;
-                microGameLauncher.launch(randomMicroGameIntent());
+                AlertDialog adDialog = new AlertDialog.Builder(this)
+                        .setMessage("잠시 후 광고가 시작됩니다...")
+                        .setCancelable(false)
+                        .create();
+                adDialog.show();
+                handler.postDelayed(() -> {
+                    adDialog.dismiss();
+                    microGameLauncher.launch(randomMicroGameIntent());
+                }, 3000L);
             }
             return;
         }
@@ -267,7 +282,15 @@ public class BoardActivity extends AppCompatActivity {
         if ("MINI_GAME_RUNNING".equals(phase)
                 && launchedMiniGameRound != game.getCurrentRound()) {
             launchedMiniGameRound = game.getCurrentRound();
-            miniGameLauncher.launch(miniGameIntent(game.getCurrentRound()));
+            AlertDialog miniGameDialog = new AlertDialog.Builder(this)
+                    .setMessage("잠시 후 미니게임이 시작됩니다...")
+                    .setCancelable(false)
+                    .create();
+            miniGameDialog.show();
+            handler.postDelayed(() -> {
+                miniGameDialog.dismiss();
+                miniGameLauncher.launch(miniGameIntent(game.getCurrentRound()));
+            }, 5000L);
         }
     }
 
@@ -326,7 +349,9 @@ public class BoardActivity extends AppCompatActivity {
                 .scaleY(active ? 1.04f : 1.0f)
                 .setDuration(160L)
                 .start();
-        panel.setText(player.getNickname() + turnLabel + "\n" + player.getScore() + "점");
+
+        String meBadge = player.getId().equals(ServerSession.getCurrentPlayerId()) ? " [나]" : "";
+        panel.setText(player.getNickname() + meBadge + turnLabel + "\n" + player.getScore() + "점");
     }
 
     private GradientDrawable createScorePanelBackground(int playerIndex, boolean active) {
@@ -394,7 +419,7 @@ public class BoardActivity extends AppCompatActivity {
         Runnable endAction = remainingSteps == 1
                 ? () -> completePlayerMovement(targetTileIndex, playerIndex)
                 : () -> hopPlayerThroughTiles(player, nextTileIndex, targetTileIndex,
-                        playerIndex, remainingSteps - 1);
+                playerIndex, remainingSteps - 1);
         placePlayerOnTile(player, nextTileIndex, playerIndex, true,
                 endAction);
     }
@@ -495,7 +520,14 @@ public class BoardActivity extends AppCompatActivity {
         if (message == null || message.trim().isEmpty()) {
             message = game.getTurnPhase();
         }
-        return "라운드 " + game.getCurrentRound() + "/" + game.getFinalRound()
+
+        int curRound = game.getCurrentRound();
+        int finalRound = game.getFinalRound();
+        if (curRound > finalRound) {
+            curRound = finalRound;
+        }
+
+        return "라운드 " + curRound + "/" + finalRound
                 + " | 현재 턴 " + name + "\n" + message;
     }
 
@@ -546,11 +578,26 @@ public class BoardActivity extends AppCompatActivity {
         ranking.sort(Comparator.comparingInt(PlayerSnapshot::getScore).reversed());
 
         StringBuilder message = new StringBuilder();
+        int rank = 1;
         for (int i = 0; i < ranking.size(); i++) {
             PlayerSnapshot player = ranking.get(i);
-            message.append(i + 1)
-                    .append("위 ")
+
+            if (i > 0 && ranking.get(i).getScore() < ranking.get(i - 1).getScore()) {
+                rank = i + 1;
+            }
+
+            boolean isTie = false;
+            if ((i > 0 && ranking.get(i).getScore() == ranking.get(i - 1).getScore()) ||
+                    (i < ranking.size() - 1 && ranking.get(i).getScore() == ranking.get(i + 1).getScore())) {
+                isTie = true;
+            }
+
+            String rankPrefix = isTie ? "공동 " + rank + "위 " : rank + "위 ";
+            String meSuffix = player.getId().equals(ServerSession.getCurrentPlayerId()) ? " [나]" : "";
+
+            message.append(rankPrefix)
                     .append(player.getNickname())
+                    .append(meSuffix)
                     .append(" - ")
                     .append(player.getScore())
                     .append("점\n");
