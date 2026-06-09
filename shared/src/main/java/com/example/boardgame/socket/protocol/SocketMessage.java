@@ -82,6 +82,14 @@ public class SocketMessage {
         return value.getAsInt();
     }
 
+    public long getLong(String key, long defaultValue) {
+        JsonElement value = fields.get(key);
+        if (value == null || value.isJsonNull()) {
+            return defaultValue;
+        }
+        return value.getAsLong();
+    }
+
     public boolean getBoolean(String key, boolean defaultValue) {
         JsonElement value = fields.get(key);
         if (value == null || value.isJsonNull()) {

@@ -144,8 +144,13 @@ public class GameState {
     }
 
     public GameSnapshot toSnapshot() {
+        return toSnapshot(0L);
+    }
+
+    public GameSnapshot toSnapshot(long revision) {
         return new GameSnapshot(
                 roomCode,
+                revision,
                 currentRound,
                 finalRound,
                 getCurrentPlayerId(),

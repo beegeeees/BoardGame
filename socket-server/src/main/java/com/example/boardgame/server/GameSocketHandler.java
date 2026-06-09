@@ -39,6 +39,13 @@ public class GameSocketHandler {
             ServerError error = ServerErrorMapper.from(e);
             logCommandFailure(session, message, error, e);
             session.sendError(message, error.code(), error.details());
+        } catch (StaleStateException e) {
+            ServerError error = ServerErrorMapper.from(e);
+            logCommandFailure(session, message, error, e);
+            session.sendError(message, error.code(), error.details());
+            publishRoom(e.getRoom());
+            publishGame(e.getRoom());
+            publishLobby();
         } catch (IllegalArgumentException | IllegalStateException e) {
             ServerError error = ServerErrorMapper.from(e);
             logCommandFailure(session, message, error, e);
@@ -131,6 +138,7 @@ public class GameSocketHandler {
 
     private void setReady(ClientSession session, SocketMessage message) {
         Room room = requireBoundRoom(session);
+        requireExpectedRevision(room, message);
         roomService.setReady(room.getCode(), session.getPlayerId(), message.getBoolean("ready", false));
         sendOk(session, message, room);
         publishRoom(room);
@@ -139,6 +147,7 @@ public class GameSocketHandler {
 
     private void startGame(ClientSession session, SocketMessage message) {
         Room room = requireBoundRoom(session);
+        requireExpectedRevision(room, message);
         roomService.requireHost(room, session.getPlayerId());
         boardGameService.startGame(room, RoomService.MIN_PLAYERS);
         sendOk(session, message, room);
@@ -149,6 +158,7 @@ public class GameSocketHandler {
 
     private void rollDice(ClientSession session, SocketMessage message) {
         Room room = requireBoundRoom(session);
+        requireExpectedRevision(room, message);
         boardGameService.rollDice(room, session.getPlayerId(), message.getInt("diceRoll", 0));
         sendOk(session, message, room);
         publishRoom(room);
@@ -157,6 +167,7 @@ public class GameSocketHandler {
 
     private void applyTileEffect(ClientSession session, SocketMessage message) {
         Room room = requireBoundRoom(session);
+        requireExpectedRevision(room, message);
         String tileType = boardGameService.applyTileEffect(room, session.getPlayerId());
         if (BoardGameService.TILE_AD.equals(tileType)) {
             microGameService.startMicroGame(room, session.getPlayerId());
@@ -168,6 +179,7 @@ public class GameSocketHandler {
 
     private void startMiniGame(ClientSession session, SocketMessage message) {
         Room room = requireBoundRoom(session);
+        requireExpectedRevision(room, message);
         roomService.requireHost(room, session.getPlayerId());
         miniGameService.startMiniGame(room);
         sendOk(session, message, room);
@@ -177,6 +189,7 @@ public class GameSocketHandler {
 
     private void submitMiniGameScore(ClientSession session, SocketMessage message) {
         Room room = requireBoundRoom(session);
+        requireExpectedRevision(room, message);
         miniGameService.submitMiniGameScore(room, session.getPlayerId(), message.getInt("score", 0));
         sendOk(session, message, room);
         publishRoom(room);
@@ -185,6 +198,7 @@ public class GameSocketHandler {
 
     private void finishMiniGame(ClientSession session, SocketMessage message) {
         Room room = requireBoundRoom(session);
+        requireExpectedRevision(room, message);
         roomService.requireHost(room, session.getPlayerId());
         miniGameService.finishMiniGame(room);
         sendOk(session, message, room);
@@ -194,6 +208,7 @@ public class GameSocketHandler {
 
     private void submitMicroGameScore(ClientSession session, SocketMessage message) {
         Room room = requireBoundRoom(session);
+        requireExpectedRevision(room, message);
         microGameService.submitMicroGameScore(room, session.getPlayerId(), message.getInt("score", 0));
         sendOk(session, message, room);
         publishRoom(room);
@@ -250,7 +265,7 @@ public class GameSocketHandler {
         if (gameState == null) {
             return;
         }
-        GameSnapshot snapshot = gameState.toSnapshot();
+        GameSnapshot snapshot = gameState.toSnapshot(room.getRevision());
         socketServer.sendToRoom(room.getCode(), SnapshotMessageMapper.gameUpdated(snapshot));
     }
 
@@ -268,6 +283,13 @@ public class GameSocketHandler {
 
     private Room requireBoundRoom(ClientSession session) {
         return roomService.requireRoom(session.getRoomCode());
+    }
+
+    private void requireExpectedRevision(Room room, SocketMessage message) {
+        long expectedRevision = message.getLong("expectedRevision", -1L);
+        if (expectedRevision >= 0L && expectedRevision != room.getRevision()) {
+            throw new StaleStateException(room);
+        }
     }
 
     private void requireNotInRoom(ClientSession session) {

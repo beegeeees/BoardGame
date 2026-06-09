@@ -21,13 +21,20 @@ public class LobbySnapshot {
         private final int playerCount;
         private final String hostNickname;
         private final boolean hasPassword;
+        private final long revision;
 
         public RoomListInfo(String code, String status, int playerCount, String hostNickname, boolean hasPassword) {
+            this(code, status, playerCount, hostNickname, hasPassword, 0L);
+        }
+
+        public RoomListInfo(String code, String status, int playerCount, String hostNickname,
+                            boolean hasPassword, long revision) {
             this.code = code;
             this.status = status;
             this.playerCount = playerCount;
             this.hostNickname = hostNickname;
             this.hasPassword = hasPassword;
+            this.revision = Math.max(0L, revision);
         }
 
         public String getCode() {
@@ -48,6 +55,10 @@ public class LobbySnapshot {
 
         public boolean hasPassword() {
             return hasPassword;
+        }
+
+        public long getRevision() {
+            return revision;
         }
     }
 }

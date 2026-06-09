@@ -6,6 +6,7 @@ import java.util.List;
 
 public class GameSnapshot {
     private final String roomCode;
+    private final long revision;
     private final int currentRound;
     private final int finalRound;
     private final String currentPlayerId;
@@ -26,7 +27,23 @@ public class GameSnapshot {
             List<String> turnOrder,
             String lastSystemMessage // 파라미터 추가
     ) {
+        this(roomCode, 0L, currentRound, finalRound, currentPlayerId, lastDiceRoll,
+                turnPhase, turnOrder, lastSystemMessage);
+    }
+
+    public GameSnapshot(
+            String roomCode,
+            long revision,
+            int currentRound,
+            int finalRound,
+            String currentPlayerId,
+            int lastDiceRoll,
+            String turnPhase,
+            List<String> turnOrder,
+            String lastSystemMessage
+    ) {
         this.roomCode = roomCode == null ? "" : roomCode;
+        this.revision = Math.max(0L, revision);
         this.currentRound = currentRound;
         this.finalRound = finalRound;
         this.currentPlayerId = currentPlayerId == null ? "" : currentPlayerId;
@@ -37,6 +54,7 @@ public class GameSnapshot {
     }
 
     public String getRoomCode() { return roomCode; }
+    public long getRevision() { return revision; }
     public int getCurrentRound() { return currentRound; }
     public int getFinalRound() { return finalRound; }
     public String getCurrentPlayerId() { return currentPlayerId; }

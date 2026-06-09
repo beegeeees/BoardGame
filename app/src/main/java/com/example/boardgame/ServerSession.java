@@ -18,7 +18,9 @@ import com.example.boardgame.socket.protocol.SocketMessage;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 public final class ServerSession {
@@ -61,7 +63,9 @@ public final class ServerSession {
     private static volatile GameSnapshot latestGameSnapshot;
     private static volatile String currentRoomCode = "";
     private static volatile String currentPlayerId = "";
-    private static volatile String pendingCommandType = "";
+    private static final Map<String, String> PENDING_COMMANDS = new ConcurrentHashMap<>();
+    private static volatile long latestRoomRevision = -1L;
+    private static volatile long latestGameRevision = -1L;
     private static volatile long connectionGeneration = 0L;
 
     static {
@@ -71,7 +75,7 @@ public final class ServerSession {
                 connectionState = state;
                 if (state == ConnectionState.DISCONNECTED) {
                     connectionGeneration += 1;
-                    pendingCommandType = "";
+                    PENDING_COMMANDS.clear();
                 }
                 dispatch(listener -> listener.onConnectionStateChanged(state));
             }
@@ -83,7 +87,7 @@ public final class ServerSession {
 
             @Override
             public void onError(Throwable throwable) {
-                pendingCommandType = "";
+                PENDING_COMMANDS.clear();
                 String details = throwable == null ? "Socket error" : throwable.getMessage();
                 dispatch(listener -> listener.onServerError("CLIENT_SOCKET_ERROR", details));
             }
@@ -166,7 +170,7 @@ public final class ServerSession {
 
     public static void disconnect() {
         connectionGeneration += 1;
-        pendingCommandType = "";
+        PENDING_COMMANDS.clear();
         clearRoomState();
         CONTROLLER.disconnect();
     }
@@ -177,8 +181,7 @@ public final class ServerSession {
                 notifyNotConnected();
                 return;
             }
-            pendingCommandType = MessageTypes.CREATE_ROOM;
-            CONTROLLER.createRoom(nickname, token, roomPassword);
+            rememberPending(CONTROLLER.createRoom(nickname, token, roomPassword), MessageTypes.CREATE_ROOM);
         }));
     }
 
@@ -188,18 +191,16 @@ public final class ServerSession {
                 notifyNotConnected();
                 return;
             }
-            pendingCommandType = MessageTypes.JOIN_ROOM;
-            CONTROLLER.joinRoom(roomCode, nickname, token, roomPassword);
+            rememberPending(CONTROLLER.joinRoom(roomCode, nickname, token, roomPassword), MessageTypes.JOIN_ROOM);
         }));
     }
 
     public static void leaveRoom() {
         String leavingRoomCode = currentRoomCode;
         if (CONTROLLER.isConnected()) {
-            pendingCommandType = MessageTypes.LEAVE_ROOM;
-            CONTROLLER.leaveRoom();
+            rememberPending(CONTROLLER.leaveRoom(), MessageTypes.LEAVE_ROOM);
         } else {
-            pendingCommandType = "";
+            PENDING_COMMANDS.clear();
         }
         clearRoomState();
         removeRoomFromLatestLobby(leavingRoomCode);
@@ -209,64 +210,58 @@ public final class ServerSession {
         if (!CONTROLLER.isConnected()) {
             return;
         }
-        pendingCommandType = MessageTypes.SET_READY;
-        CONTROLLER.setReady(ready);
+        rememberPending(CONTROLLER.setReady(ready, latestKnownRevision()), MessageTypes.SET_READY);
     }
 
     public static void startGame() {
         if (!CONTROLLER.isConnected()) {
             return;
         }
-        pendingCommandType = MessageTypes.START_GAME;
-        CONTROLLER.startGame();
+        rememberPending(CONTROLLER.startGame(latestKnownRevision()), MessageTypes.START_GAME);
     }
 
     public static void rollDice(int diceRoll) {
         if (!CONTROLLER.isConnected()) {
             return;
         }
-        pendingCommandType = MessageTypes.ROLL_DICE;
-        CONTROLLER.rollDice(diceRoll);
+        rememberPending(CONTROLLER.rollDice(diceRoll, latestKnownRevision()), MessageTypes.ROLL_DICE);
     }
 
     public static void applyTileEffect() {
         if (!CONTROLLER.isConnected()) {
             return;
         }
-        pendingCommandType = MessageTypes.APPLY_TILE_EFFECT;
-        CONTROLLER.applyTileEffect();
+        rememberPending(CONTROLLER.applyTileEffect(latestKnownRevision()), MessageTypes.APPLY_TILE_EFFECT);
     }
 
     public static void startMiniGame(String miniGameType) {
         if (!CONTROLLER.isConnected()) {
             return;
         }
-        pendingCommandType = MessageTypes.START_MINI_GAME;
-        CONTROLLER.startMiniGame(miniGameType);
+        rememberPending(CONTROLLER.startMiniGame(miniGameType, latestKnownRevision()), MessageTypes.START_MINI_GAME);
     }
 
     public static void submitMiniGameScore(int score) {
         if (!CONTROLLER.isConnected()) {
             return;
         }
-        pendingCommandType = MessageTypes.SUBMIT_MINI_GAME_SCORE;
-        CONTROLLER.submitMiniGameScore(score);
+        rememberPending(CONTROLLER.submitMiniGameScore(score, latestKnownRevision()),
+                MessageTypes.SUBMIT_MINI_GAME_SCORE);
     }
 
     public static void finishMiniGame() {
         if (!CONTROLLER.isConnected()) {
             return;
         }
-        pendingCommandType = MessageTypes.FINISH_MINI_GAME;
-        CONTROLLER.finishMiniGame();
+        rememberPending(CONTROLLER.finishMiniGame(latestKnownRevision()), MessageTypes.FINISH_MINI_GAME);
     }
 
     public static void submitMicroGameScore(int score) {
         if (!CONTROLLER.isConnected()) {
             return;
         }
-        pendingCommandType = MessageTypes.SUBMIT_MICRO_GAME_SCORE;
-        CONTROLLER.submitMicroGameScore(score);
+        rememberPending(CONTROLLER.submitMicroGameScore(score, latestKnownRevision()),
+                MessageTypes.SUBMIT_MICRO_GAME_SCORE);
     }
 
     private static boolean runWhenConnected(Context context, ConnectedAction action) {
@@ -277,7 +272,7 @@ public final class ServerSession {
         if (connectionState == ConnectionState.DISCONNECTED) {
             connect(context.getApplicationContext());
         }
-        pendingCommandType = "";
+        PENDING_COMMANDS.clear();
         notifyNotConnected();
         return false;
     }
@@ -287,7 +282,7 @@ public final class ServerSession {
     }
 
     private static void notifyNotConnected() {
-        pendingCommandType = "";
+        PENDING_COMMANDS.clear();
         dispatch(listener -> listener.onServerError(
                 "CLIENT_NOT_CONNECTED",
                 "서버 연결 후 다시 시도해 주세요."
@@ -325,22 +320,40 @@ public final class ServerSession {
             return;
         }
         if (MessageTypes.ROOM_UPDATED.equals(type)) {
-            latestRoomSnapshot = SnapshotMessageMapper.toRoomSnapshot(message);
+            RoomSnapshot incomingRoom = SnapshotMessageMapper.toRoomSnapshot(message);
+            if (!shouldAcceptRoomSnapshot(incomingRoom.getCode())) {
+                return;
+            }
+            if (incomingRoom.getRevision() < latestRoomRevision) {
+                return;
+            }
+            latestRoomSnapshot = incomingRoom;
+            latestRoomRevision = incomingRoom.getRevision();
             currentRoomCode = latestRoomSnapshot.getCode();
             dispatch(listener -> listener.onRoomUpdated(latestRoomSnapshot));
             return;
         }
         if (MessageTypes.GAME_UPDATED.equals(type)) {
-            latestGameSnapshot = SnapshotMessageMapper.toGameSnapshot(message);
+            GameSnapshot incomingGame = SnapshotMessageMapper.toGameSnapshot(message);
+            if (!shouldAcceptRoomSnapshot(incomingGame.getRoomCode())) {
+                return;
+            }
+            if (incomingGame.getRevision() < latestGameRevision) {
+                return;
+            }
+            latestGameSnapshot = incomingGame;
+            latestGameRevision = incomingGame.getRevision();
             dispatch(listener -> listener.onGameUpdated(latestGameSnapshot));
             return;
         }
         if (MessageTypes.REQUEST_OK.equals(type)) {
             String roomCode = message.getOrDefault("roomCode", "");
             String playerId = message.getOrDefault("playerId", "");
-            String commandType = pendingCommandType;
-            pendingCommandType = "";
-            if (MessageTypes.LEAVE_ROOM.equals(commandType)) {
+            String resolvedCommandType = PENDING_COMMANDS.remove(message.getRequestId());
+            if (resolvedCommandType == null) {
+                resolvedCommandType = "";
+            }
+            if (MessageTypes.LEAVE_ROOM.equals(resolvedCommandType)) {
                 clearRoomState();
             }
             if (!roomCode.isEmpty()) {
@@ -349,15 +362,19 @@ public final class ServerSession {
             if (!playerId.isEmpty()) {
                 currentPlayerId = playerId;
             }
+            String commandType = resolvedCommandType;
             dispatch(listener -> listener.onRequestOk(commandType, roomCode, playerId));
             return;
         }
         if (MessageTypes.REQUEST_ERROR.equals(type)) {
-            String commandType = pendingCommandType;
-            pendingCommandType = "";
-            if (MessageTypes.LEAVE_ROOM.equals(commandType)) {
+            String resolvedCommandType = PENDING_COMMANDS.remove(message.getRequestId());
+            if (resolvedCommandType == null) {
+                resolvedCommandType = "";
+            }
+            if (MessageTypes.LEAVE_ROOM.equals(resolvedCommandType)) {
                 clearRoomState();
             }
+            String commandType = resolvedCommandType;
             dispatch(listener -> listener.onServerError(
                     message.getOrDefault("errorCode", "REQUEST_ERROR"),
                     message.getOrDefault("details", "Request failed")
@@ -370,6 +387,8 @@ public final class ServerSession {
         currentPlayerId = "";
         latestRoomSnapshot = null;
         latestGameSnapshot = null;
+        latestRoomRevision = -1L;
+        latestGameRevision = -1L;
     }
 
     private static void removeRoomFromLatestLobby(String roomCode) {
@@ -393,6 +412,33 @@ public final class ServerSession {
 
         latestLobbySnapshot = new LobbySnapshot(retainedRooms);
         dispatch(listener -> listener.onLobbyUpdated(latestLobbySnapshot));
+    }
+
+    private static void rememberPending(String requestId, String commandType) {
+        if (requestId != null && !requestId.trim().isEmpty()) {
+            PENDING_COMMANDS.put(requestId, commandType);
+        }
+    }
+
+    private static boolean shouldAcceptRoomSnapshot(String roomCode) {
+        String normalizedRoomCode = roomCode == null ? "" : roomCode.trim();
+        if (normalizedRoomCode.isEmpty()) {
+            return false;
+        }
+        String activeRoomCode = currentRoomCode;
+        if (!activeRoomCode.isEmpty()) {
+            return normalizedRoomCode.equalsIgnoreCase(activeRoomCode);
+        }
+        return hasPendingRoomEntryCommand();
+    }
+
+    private static boolean hasPendingRoomEntryCommand() {
+        return PENDING_COMMANDS.containsValue(MessageTypes.CREATE_ROOM)
+                || PENDING_COMMANDS.containsValue(MessageTypes.JOIN_ROOM);
+    }
+
+    private static long latestKnownRevision() {
+        return Math.max(latestRoomRevision, latestGameRevision);
     }
 
     private static SharedPreferences prefs(Context context) {

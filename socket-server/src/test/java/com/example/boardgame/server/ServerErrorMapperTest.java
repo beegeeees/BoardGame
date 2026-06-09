@@ -1,6 +1,7 @@
 package com.example.boardgame.server;
 
 import com.example.boardgame.socket.protocol.ErrorCodes;
+import com.example.boardgame.server.model.Room;
 
 import org.junit.Test;
 
@@ -38,6 +39,14 @@ public class ServerErrorMapperTest {
 
         assertEquals(ErrorCodes.UNAUTHENTICATED, error.code());
         assertEquals("Authentication required", error.details());
+    }
+
+    @Test
+    public void mapsStaleStateError() {
+        ServerError error = ServerErrorMapper.from(new StaleStateException(new Room("ABC123")));
+
+        assertEquals(ErrorCodes.STALE_STATE, error.code());
+        assertEquals("State changed. Please retry.", error.details());
     }
 
     private void assertError(String expectedCode, RuntimeException exception) {

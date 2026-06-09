@@ -1,211 +1,179 @@
-# WAN ngrok Guide
+# Server Setup And ngrok
 
-Use this for temporary WAN testing from phones or remote devices.
+This guide covers local LAN testing, Firebase Admin auth, and temporary WAN testing through ngrok.
 
-ngrok provides the public TLS endpoint. The Java socket server still runs plain `ws://` locally.
+## Server Defaults
 
-```text
-Android wss://<ngrok-domain>/game
-        |
-        v
-ngrok public HTTPS/WebSocket endpoint
-        |
-        v
-local ws://localhost:8080/game
-```
-
-## 1. Start Server
-
-For Firebase Auth testing:
+Start server on port `8080`:
 
 ```bash
-FIREBASE_SERVICE_ACCOUNT=/absolute/path/to/service-account.json BOARDGAME_NETWORK=WAN ./gradlew :socket-server:run
+./gradlew :socket-server:run
 ```
 
-For temporary game-flow testing without Firebase Admin:
+Start server on a different port:
 
 ```bash
-BOARDGAME_NETWORK=WAN ./gradlew :socket-server:run
+./gradlew :socket-server:run --args="9090"
 ```
 
-Rules:
-
-- `FIREBASE_SERVICE_ACCOUNT` or `GOOGLE_APPLICATION_CREDENTIALS` set: Firebase Admin auth.
-- No credential path set: dev auth.
-- `BOARDGAME_NETWORK=WAN`: bind local server to `127.0.0.1` for ngrok.
-- `BOARDGAME_NETWORK` unset: bind local server to `0.0.0.0` for LAN.
-
-The service-account JSON file can have any filename. The env var points to its path.
-
-Expected server output includes:
+Default behavior:
 
 ```text
-BoardGame socket server listening on ws://127.0.0.1:8080/game
-BoardGame network=WAN auth=FIREBASE
-For ngrok WAN testing: ngrok http 8080 then connect Android to wss://<ngrok-domain>/game
+no credential env var      -> DEV auth
+credential env var exists  -> FIREBASE auth
+BOARDGAME_NETWORK unset    -> LAN bind, 0.0.0.0
+BOARDGAME_NETWORK=WAN      -> WAN/ngrok bind, 127.0.0.1
 ```
 
-On connect, Android should log a `SERVER_HELLO` summary like:
+## Firebase Auth
+
+The Android app needs:
 
 ```text
-Server FIREBASE / WAN / protocol 1
+app/google-services.json
 ```
 
-## 2. Start ngrok
+The server needs a Firebase Admin service account only when testing real Firebase token verification.
 
-In another terminal:
+Use either env var:
 
 ```bash
-ngrok http 8080
+FIREBASE_SERVICE_ACCOUNT=/absolute/path/to/service-account.json ./gradlew :socket-server:run
 ```
 
-ngrok will print a public HTTPS URL like:
+or:
 
-```text
-https://abc123.ngrok-free.app
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/service-account.json ./gradlew :socket-server:run
 ```
 
-Use the same host with `wss://` in Android:
+The JSON filename does not matter. The env var points to the file path.
 
-```text
-wss://abc123.ngrok-free.app/game
+If neither env var is set, the server uses `DevAuthVerifier`. That is useful for local gameplay tests, but it is not production-safe.
+
+## LAN Testing
+
+Start the server:
+
+```bash
+./gradlew :socket-server:run
 ```
 
-Do not use:
-
-```text
-https://abc123.ngrok-free.app/game
-```
-
-The Android socket client needs `wss://`, not `https://`.
-
-## 3. Android Setup
-
-In the app `Server URL` input, replace the local URL:
+Android emulator URL:
 
 ```text
 ws://10.0.2.2:8080/game
 ```
 
-with:
+Physical phone on same Wi-Fi:
 
 ```text
-wss://<ngrok-domain>/game
+ws://YOUR_COMPUTER_LAN_IP:8080/game
 ```
 
-Use the same ngrok URL on every test device.
+The app has server preset buttons for emulator, LAN, and WAN.
 
-The debug client also has quick preset buttons:
+## WAN Testing With ngrok
 
-- `Emu`: `ws://10.0.2.2:8080/game`
-- `LAN`: `ws://YOUR_LAN_IP:8080/game`
-- `WAN`: `wss://sandworm-ferret-bath.ngrok-free.dev/game`
+ngrok gives a public TLS endpoint while the Java server still runs locally.
 
-Current default WAN preset:
+```text
+Android wss://<ngrok-domain>/game
+        -> ngrok
+        -> local ws://127.0.0.1:8080/game
+```
+
+Start the server for ngrok:
+
+```bash
+BOARDGAME_NETWORK=WAN ./gradlew :socket-server:run
+```
+
+With Firebase Admin auth:
+
+```bash
+FIREBASE_SERVICE_ACCOUNT=/absolute/path/to/service-account.json BOARDGAME_NETWORK=WAN ./gradlew :socket-server:run
+```
+
+Start ngrok in another terminal:
+
+```bash
+ngrok http 8080
+```
+
+If ngrok prints:
+
+```text
+https://abc123.ngrok-free.app
+```
+
+Use this in Android:
+
+```text
+wss://abc123.ngrok-free.app/game
+```
+
+Use `wss://`, not `https://`, because the Android client opens a WebSocket.
+
+Current WAN preset in the app:
 
 ```text
 wss://sandworm-ferret-bath.ngrok-free.dev/game
 ```
 
-The Android default is still emulator/local. Tap `WAN` to use the ngrok address.
+## Smoke Test
 
-## 4. Smoke Test Checklist
+1. Start server.
+2. Start ngrok if testing WAN.
+3. Open app on client A and connect.
+4. Create a room.
+5. Open app on client B and connect to the same URL.
+6. Join by room code.
+7. Toggle ready for both players.
+8. Host starts the game.
+9. Roll dice and apply tile effects.
+10. Test leaving/disconnect and confirm lobby/room UI updates.
 
-Use two physical phones, or one phone plus one emulator.
+## Expected Server Logs
 
-1. Start the local socket server.
-2. Start `ngrok http 8080`.
-3. Open the Android app on client A.
-4. Set `Server URL` to `wss://<ngrok-domain>/game`.
-5. Tap `Connect`.
-6. Confirm the server logs `event=socket_open`.
-7. Tap `Create`.
-8. Confirm client A receives room state and a room code.
-9. Open client B.
-10. Set the same `Server URL`.
-11. Tap `Connect`.
-12. Enter client A's room code.
-13. Tap `Join`.
-14. Confirm both clients see the same room player list.
-15. Set both clients ready.
-16. Host taps `Start`.
-17. Current player rolls and applies tile effect.
-18. If a password room is used, verify wrong password returns `REQUEST_ERROR` with `INVALID_ROOM_PASSWORD`.
-19. Kill or disconnect one client and confirm the other client receives an updated room/game state.
-
-For meaningful Firebase Auth testing, set `FIREBASE_SERVICE_ACCOUNT` or `GOOGLE_APPLICATION_CREDENTIALS`.
-
-## 5. What To Watch
-
-Server logs should look like:
+Startup:
 
 ```text
-event=socket_open remote=/127.0.0.1:...
-event=command_failed type=JOIN_ROOM requestId=... roomCode=- playerId=- errorCode=ROOM_NOT_FOUND cause=IllegalArgumentException
-event=socket_close remote=/127.0.0.1:... code=1000 remoteClosed=true reason=-
+BoardGame socket server listening on ws://127.0.0.1:8080/game
+BoardGame network=WAN auth=FIREBASE
 ```
 
-Android request errors should use stable `errorCode` values, not raw server exception details.
-
-Useful expected errors:
+Connection:
 
 ```text
-ROOM_NOT_FOUND
-ROOM_FULL
-INVALID_ROOM_PASSWORD
-NOT_HOST
-NOT_YOUR_TURN
-INVALID_PHASE
-UNAUTHENTICATED
-MALFORMED_MESSAGE
+event=socket_open remote=...
+event=socket_close remote=...
 ```
 
-## 6. Troubleshooting
+Command error:
+
+```text
+event=command_failed type=JOIN_ROOM requestId=... errorCode=ROOM_NOT_FOUND
+```
+
+## Troubleshooting
 
 If Android cannot connect:
 
-- Confirm the URL starts with `wss://`.
-- Confirm it ends with `/game`.
-- Confirm ngrok is still running.
-- Confirm the local server is still running.
-- Restart ngrok and update the Android URL if using a free random domain.
+- check the URL ends with `/game`
+- use `ws://` for LAN and `wss://` for ngrok
+- keep ngrok and the local server running
+- update the app URL if a free ngrok domain changes
+- do not use `127.0.0.1` on a physical phone
 
-If connect works but commands fail with `UNAUTHENTICATED`:
+If commands fail with `UNAUTHENTICATED`:
 
-- Check Android Firebase sign-in.
-- Check `app/google-services.json`.
-- Check `FIREBASE_SERVICE_ACCOUNT` or `GOOGLE_APPLICATION_CREDENTIALS` on the server.
-- For non-auth gameplay testing only, restart the server without a credential path env var.
+- check `app/google-services.json`
+- check `FIREBASE_SERVICE_ACCOUNT` or `GOOGLE_APPLICATION_CREDENTIALS`
+- restart without credential env vars for DEV auth gameplay testing
 
-If only local emulator works:
+If two clients do not see the same room:
 
-- Make sure the phone has internet access.
-- Use the ngrok `wss://` URL, not `ws://10.0.2.2:8080/game`.
-- Do not point a physical phone at `127.0.0.1`; that means the phone itself.
-
-If ngrok shows connections but the app does not update:
-
-- Check server logs for `event=malformed_message` or `event=command_failed`.
-- Check Android logcat for WebSocket close/error messages.
-- Confirm both clients are using the same current ngrok domain.
-
-## Notes
-
-- Free ngrok domains can change each time you restart ngrok.
-- `wss://` is enough for Android TLS transport; no Android cleartext exception is needed for the ngrok URL.
-- The local server does not need native TLS for this flow because ngrok terminates public TLS.
-- Keep real Firebase Admin verification enabled for meaningful WAN testing.
-- Running without a credential path uses dev auth and is only for local/demo testing.
-
-## Still Not Solved
-
-This is WAN smoke testing, not production hosting.
-
-Still needed later:
-
-- reconnect/resume
-- inactive non-empty room cleanup
-- stronger heartbeat timeout policy if Java-WebSocket connection timeout is not enough
-- metrics
-- basic rate limiting/origin controls
-- a stable domain or real deployment target
+- confirm both clients use the same server URL
+- check server logs for `command_failed`
+- reconnect both clients and retry room creation/join

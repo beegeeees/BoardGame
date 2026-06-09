@@ -10,6 +10,9 @@ final class ServerErrorMapper {
         if (throwable instanceof AuthException) {
             return new ServerError(ErrorCodes.UNAUTHENTICATED, "Authentication required");
         }
+        if (throwable instanceof StaleStateException) {
+            return new ServerError(ErrorCodes.STALE_STATE, "State changed. Please retry.");
+        }
 
         String message = throwable.getMessage() == null ? "" : throwable.getMessage();
 

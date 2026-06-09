@@ -16,6 +16,32 @@ import static org.junit.Assert.fail;
 
 public class RoomServiceTest {
     @Test
+    public void roomRevisionStartsAtZeroAndIncrementsOnTouch() {
+        Room room = new Room("ABC123");
+
+        assertEquals(0L, room.getRevision());
+
+        room.touch();
+
+        assertEquals(1L, room.getRevision());
+    }
+
+    @Test
+    public void roomRevisionIncreasesAfterMembershipAndReadyChanges() {
+        RoomService roomService = new RoomService();
+        Room room = roomService.createRoom("uid-1", "Player 1");
+        long createdRevision = room.getRevision();
+
+        Player secondPlayer = roomService.joinRoom(room.getCode(), "uid-2", "Player 2");
+        long joinedRevision = room.getRevision();
+        roomService.setReady(room.getCode(), secondPlayer.getId(), true);
+
+        assertTrue(createdRevision > 0L);
+        assertTrue(joinedRevision > createdRevision);
+        assertTrue(room.getRevision() > joinedRevision);
+    }
+
+    @Test
     public void sameUidCannotCreateTwoRooms() {
         RoomService roomService = new RoomService();
         roomService.createRoom("uid-1", "Player 1");

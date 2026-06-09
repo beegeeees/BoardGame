@@ -25,6 +25,7 @@ public class SocketMessageTest {
         assertEquals("request-1", parsed.getRequestId());
         assertEquals("Player One", parsed.getOrDefault("nickname", ""));
         assertEquals(12, parsed.getInt("score", 0));
+        assertEquals(123456789L, parsed.getLong("serverTimeMillis", 0L));
         assertEquals("123456789", parsed.getOrDefault("serverTimeMillis", ""));
         assertTrue(parsed.getBoolean("ready", false));
         assertEquals("a&b=c", parsed.getOrDefault("symbols", ""));

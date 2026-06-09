@@ -20,6 +20,7 @@ public class Room {
     private final String code;
     private final long createdAtMillis;
     private long updatedAtMillis;
+    private long revision;
     private String hostPlayerId = "";
     private String status = WAITING;
     private byte[] passwordSalt;
@@ -92,7 +93,7 @@ public class Room {
         for (Player player : players.values()) {
             playerSnapshots.add(player.toSnapshot());
         }
-        return new RoomSnapshot(code, hostPlayerId, status, playerSnapshots);
+        return new RoomSnapshot(code, hostPlayerId, status, revision, playerSnapshots);
     }
 
     public LobbySnapshot.RoomListInfo toRoomListInfo() {
@@ -102,7 +103,8 @@ public class Room {
                 status,
                 players.size(),
                 host == null ? "" : host.getNickname(),
-                hasPassword()
+                hasPassword(),
+                revision
         );
     }
 
@@ -131,6 +133,7 @@ public class Room {
     }
 
     public void touch() {
+        revision++;
         updatedAtMillis = System.currentTimeMillis();
     }
 
@@ -168,4 +171,5 @@ public class Room {
 
     public long getCreatedAtMillis() { return createdAtMillis; }
     public long getUpdatedAtMillis() { return updatedAtMillis; }
+    public long getRevision() { return revision; }
 }

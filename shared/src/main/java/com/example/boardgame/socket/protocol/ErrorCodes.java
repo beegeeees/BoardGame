@@ -6,6 +6,7 @@ public final class ErrorCodes {
     public static final String UNSUPPORTED_TYPE = "UNSUPPORTED_TYPE";
     public static final String BAD_REQUEST = "BAD_REQUEST";
     public static final String INVALID_STATE = "INVALID_STATE";
+    public static final String STALE_STATE = "STALE_STATE";
     public static final String INVALID_PHASE = "INVALID_PHASE";
     public static final String INVALID_SCORE = "INVALID_SCORE";
 
