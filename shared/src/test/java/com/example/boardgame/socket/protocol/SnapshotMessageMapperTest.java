@@ -16,6 +16,7 @@ public class SnapshotMessageMapperTest {
                 "ABCD",
                 "player-1",
                 "WAITING",
+                7L,
                 Arrays.asList(
                         new PlayerSnapshot("player-1", "Host", 10, 3, true, true, false, Collections.emptyList()),
                         new PlayerSnapshot("player-2", "Guest", 4, 1, false, false, false, Collections.emptyList())
@@ -31,6 +32,7 @@ public class SnapshotMessageMapperTest {
         assertEquals("ABCD", parsed.getCode());
         assertEquals("player-1", parsed.getHostPlayerId());
         assertEquals("WAITING", parsed.getStatus());
+        assertEquals(7L, parsed.getRevision());
         assertEquals(2, parsed.getPlayers().size());
         assertEquals("Guest", parsed.getPlayers().get(1).getNickname());
         assertEquals(4, parsed.getPlayers().get(1).getScore());
@@ -40,6 +42,7 @@ public class SnapshotMessageMapperTest {
     public void gameSnapshotUsesNestedJsonTurnOrder() {
         GameSnapshot snapshot = new GameSnapshot(
                 "ABCD",
+                9L,
                 2,
                 5,
                 "player-2",
@@ -56,6 +59,7 @@ public class SnapshotMessageMapperTest {
         assertTrue(wireText.contains("\"game\""));
         assertTrue(wireText.contains("\"turnOrder\""));
         assertEquals("ABCD", parsed.getRoomCode());
+        assertEquals(9L, parsed.getRevision());
         assertEquals(2, parsed.getCurrentRound());
         assertEquals(5, parsed.getFinalRound());
         assertEquals("player-2", parsed.getCurrentPlayerId());
@@ -68,7 +72,7 @@ public class SnapshotMessageMapperTest {
     public void lobbySnapshotUsesRoomListWithPasswordFlagOnly() {
         LobbySnapshot snapshot = new LobbySnapshot(
                 Arrays.asList(
-                        new LobbySnapshot.RoomListInfo("123456", "WAITING", 1, "Host", true)
+                        new LobbySnapshot.RoomListInfo("123456", "WAITING", 1, "Host", true, 11L)
                 )
         );
 
@@ -83,5 +87,24 @@ public class SnapshotMessageMapperTest {
         assertEquals(1, parsed.getRooms().size());
         assertEquals("123456", parsed.getRooms().get(0).getCode());
         assertTrue(parsed.getRooms().get(0).hasPassword());
+        assertEquals(11L, parsed.getRooms().get(0).getRevision());
+    }
+
+    @Test
+    public void missingSnapshotRevisionDefaultsToZero() {
+        RoomSnapshot room = SnapshotMessageMapper.toRoomSnapshot(SocketMessage.parse("{"
+                + "\"type\":\"ROOM_UPDATED\","
+                + "\"fields\":{\"room\":{\"code\":\"ABCD\",\"hostPlayerId\":\"p1\","
+                + "\"status\":\"WAITING\",\"players\":[]}}"
+                + "}"));
+        GameSnapshot game = SnapshotMessageMapper.toGameSnapshot(SocketMessage.parse("{"
+                + "\"type\":\"GAME_UPDATED\","
+                + "\"fields\":{\"game\":{\"roomCode\":\"ABCD\",\"currentRound\":1,"
+                + "\"finalRound\":3,\"currentPlayerId\":\"p1\",\"lastDiceRoll\":0,"
+                + "\"turnPhase\":\"WAITING_FOR_ROLL\",\"turnOrder\":[]}}"
+                + "}"));
+
+        assertEquals(0L, room.getRevision());
+        assertEquals(0L, game.getRevision());
     }
 }

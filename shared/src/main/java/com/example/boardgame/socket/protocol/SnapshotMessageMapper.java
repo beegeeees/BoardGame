@@ -40,6 +40,7 @@ public final class SnapshotMessageMapper {
                 string(room, "code"),
                 string(room, "hostPlayerId"),
                 string(room, "status"),
+                longValue(room, "revision", 0L),
                 players(room.get("players"))
         );
     }
@@ -48,6 +49,7 @@ public final class SnapshotMessageMapper {
         JsonObject game = message.getObject(FIELD_GAME);
         return new GameSnapshot(
                 string(game, "roomCode"),
+                longValue(game, "revision", 0L),
                 integer(game, "currentRound", 1),
                 integer(game, "finalRound", 5),
                 string(game, "currentPlayerId"),
@@ -70,6 +72,7 @@ public final class SnapshotMessageMapper {
         room.addProperty("code", snapshot.getCode());
         room.addProperty("hostPlayerId", snapshot.getHostPlayerId());
         room.addProperty("status", snapshot.getStatus());
+        room.addProperty("revision", snapshot.getRevision());
 
         JsonArray players = new JsonArray();
         for (PlayerSnapshot player : snapshot.getPlayers()) {
@@ -96,6 +99,7 @@ public final class SnapshotMessageMapper {
         roomListInfo.addProperty("playerCount", snapshot.getPlayerCount());
         roomListInfo.addProperty("hostNickname", snapshot.getHostNickname());
         roomListInfo.addProperty("hasPassword", snapshot.hasPassword());
+        roomListInfo.addProperty("revision", snapshot.getRevision());
 
         return roomListInfo;
     }
@@ -122,6 +126,7 @@ public final class SnapshotMessageMapper {
     private static JsonObject toJson(GameSnapshot snapshot) {
         JsonObject game = new JsonObject();
         game.addProperty("roomCode", snapshot.getRoomCode());
+        game.addProperty("revision", snapshot.getRevision());
         game.addProperty("currentRound", snapshot.getCurrentRound());
         game.addProperty("finalRound", snapshot.getFinalRound());
         game.addProperty("currentPlayerId", snapshot.getCurrentPlayerId());
@@ -177,7 +182,8 @@ public final class SnapshotMessageMapper {
                     string(room, "status"),
                     integer(room, "playerCount", 0),
                     string(room, "hostNickname"),
-                    bool(room, "hasPassword", false)
+                    bool(room, "hasPassword", false),
+                    longValue(room, "revision", 0L)
             ));
         }
         return rooms;
@@ -202,6 +208,11 @@ public final class SnapshotMessageMapper {
     private static int integer(JsonObject object, String key, int defaultValue) {
         JsonElement value = object.get(key);
         return value == null || value.isJsonNull() ? defaultValue : value.getAsInt();
+    }
+
+    private static long longValue(JsonObject object, String key, long defaultValue) {
+        JsonElement value = object.get(key);
+        return value == null || value.isJsonNull() ? defaultValue : value.getAsLong();
     }
 
     private static boolean bool(JsonObject object, String key, boolean defaultValue) {

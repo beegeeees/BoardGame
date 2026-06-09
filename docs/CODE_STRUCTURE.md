@@ -1,61 +1,51 @@
 # Code Structure
 
-The project is now intentionally small:
+This project is a Java Android client plus a Java WebSocket server. Firebase is used for Auth only; live room and game state are not stored in Firebase Realtime Database.
 
-- Android app for Firebase Auth, socket connection, and UI.
-- Shared Java module for protocol code.
-- JVM socket server for LAN room/game state.
-
-The old Firebase Realtime Database gameplay path has been removed.
-
-## Layout
+## Modules
 
 ```text
-BoardGame/
-├── app/
-│   └── src/main/java/com/example/boardgame/
-│       ├── auth/
-│       │   └── FirebaseAuthTokenProvider.java
-│       ├── controller/socket/
-│       │   └── SocketRoomController.java
-│       ├── socket/
-│       │   └── BoardGameSocketClient.java
-│       └── MainActivity.java
-├── shared/
-│   └── src/main/java/com/example/boardgame/socket/
-│       └── protocol/
-└── socket-server/
-    └── src/main/java/com/example/boardgame/server/
-        ├── model/
-        └── service/
+app/             Android UI, Firebase sign-in, WebSocket client
+shared/          Socket protocol DTOs and JSON mapping
+socket-server/   Authoritative lobby, room, and board-game server
 ```
 
-## `app`
+## Android Client
 
-Android client responsibilities:
+Main responsibilities:
 
-- Sign in with Firebase Auth.
-- Get the current Firebase ID token.
-- Connect to the socket server.
-- Send user intentions such as create room, join room, ready, start game, and roll dice.
-- Display the latest server snapshots.
+- choose server URL and connect
+- sign in as guest/Firebase anonymous user
+- create/join/leave rooms
+- render lobby, waiting room, board, dice, mini-game, and micro-game UI
+- send user commands to the server
+- render server snapshots as the official state
 
 Important files:
 
 ```text
-app/src/main/java/com/example/boardgame/auth/FirebaseAuthTokenProvider.java
+app/src/main/java/com/example/boardgame/ServerSession.java
 app/src/main/java/com/example/boardgame/controller/socket/SocketRoomController.java
 app/src/main/java/com/example/boardgame/socket/BoardGameSocketClient.java
+app/src/main/java/com/example/boardgame/LobbyListActivity.java
+app/src/main/java/com/example/boardgame/LobbyActivity.java
+app/src/main/java/com/example/boardgame/BoardActivity.java
+app/src/main/java/com/example/boardgame/DiceActivity.java
+app/src/main/java/com/example/boardgame/AdGame1Activity.java
+app/src/main/java/com/example/boardgame/AdGame2Activity.java
+app/src/main/java/com/example/boardgame/AdGame3Activity.java
 ```
 
-## `shared`
+`ServerSession` is the client-side socket state hub. Activities should read snapshots from it instead of keeping their own independent room/game truth.
 
-Shared responsibilities:
+## Shared Protocol
 
-- Define message names.
-- Encode/decode socket messages.
-- Provide snapshot DTOs for room/game state.
-- Stay independent from Android, Firebase, and server libraries.
+Main responsibilities:
+
+- define message names
+- parse and serialize socket envelopes
+- define lobby, room, player, and game snapshots
+- keep protocol code independent from Android and server-only libraries
 
 Important files:
 
@@ -63,78 +53,81 @@ Important files:
 shared/src/main/java/com/example/boardgame/socket/protocol/MessageTypes.java
 shared/src/main/java/com/example/boardgame/socket/protocol/SocketMessage.java
 shared/src/main/java/com/example/boardgame/socket/protocol/SnapshotMessageMapper.java
+shared/src/main/java/com/example/boardgame/socket/protocol/LobbySnapshot.java
 shared/src/main/java/com/example/boardgame/socket/protocol/RoomSnapshot.java
 shared/src/main/java/com/example/boardgame/socket/protocol/GameSnapshot.java
 ```
 
-Rules:
+Protocol rule:
 
-- No Android imports.
-- No Firebase imports.
-- No server-only imports.
+```text
+Client sends command messages.
+Server replies with REQUEST_OK/REQUEST_ERROR and broadcasts snapshots.
+```
 
-## `socket-server`
+## Socket Server
 
-Server responsibilities:
+Main responsibilities:
 
-- Accept WebSocket connections.
-- Match players into rooms.
-- Own ready state.
-- Own turn order.
-- Roll dice server-side.
-- Broadcast room/game snapshots.
-- Reject invalid commands.
+- accept WebSocket connections
+- verify Firebase ID tokens for room entry when credentials are configured
+- own room membership, host, ready state, passwords, and cleanup
+- own turn order, dice, tile effects, score changes, and game phases
+- broadcast `LOBBY_UPDATED`, `ROOM_UPDATED`, and `GAME_UPDATED`
+- reject invalid, stale, or out-of-phase commands
 
 Important files:
 
 ```text
 socket-server/src/main/java/com/example/boardgame/server/BoardGameSocketServer.java
-socket-server/src/main/java/com/example/boardgame/server/ClientSession.java
 socket-server/src/main/java/com/example/boardgame/server/GameSocketHandler.java
-socket-server/src/main/java/com/example/boardgame/server/AuthVerifier.java
+socket-server/src/main/java/com/example/boardgame/server/ClientSession.java
+socket-server/src/main/java/com/example/boardgame/server/ServerErrorMapper.java
 socket-server/src/main/java/com/example/boardgame/server/FirebaseAdminAuthVerifier.java
+socket-server/src/main/java/com/example/boardgame/server/DevAuthVerifier.java
 ```
 
-Server package layout:
+Server models:
 
 ```text
-model/
-  Room.java
-  Player.java
-  GameState.java
-  MiniGameState.java
-  MicroGameState.java
-
-service/
-  RoomService.java
-  BoardGameService.java
-  MiniGameService.java
-  MicroGameService.java
-  ScoreService.java
+socket-server/src/main/java/com/example/boardgame/server/model/Room.java
+socket-server/src/main/java/com/example/boardgame/server/model/Player.java
+socket-server/src/main/java/com/example/boardgame/server/model/GameState.java
+socket-server/src/main/java/com/example/boardgame/server/model/MiniGameState.java
+socket-server/src/main/java/com/example/boardgame/server/model/MicroGameState.java
 ```
 
-This is the intended starting backend layout. `GameSocketHandler` receives commands and broadcasts snapshots. `RoomService` owns lobby and room membership. `BoardGameService` owns turn, dice, movement, and tile flow. `MiniGameService` and `MicroGameService` own their timed score flows. `ScoreService` ranks raw scores and applies rewards.
+Server services:
 
-## Authority Rules
+```text
+socket-server/src/main/java/com/example/boardgame/server/service/RoomService.java
+socket-server/src/main/java/com/example/boardgame/server/service/BoardGameService.java
+socket-server/src/main/java/com/example/boardgame/server/service/MiniGameService.java
+socket-server/src/main/java/com/example/boardgame/server/service/MicroGameService.java
+socket-server/src/main/java/com/example/boardgame/server/service/ScoreService.java
+```
+
+## Data Ownership
 
 Server owns:
 
-- Room membership.
-- Matchmaking.
-- Ready state.
-- Turn order.
-- Dice rolls.
-- Random events.
-- Card draws.
-- Tile effects.
-- Score rewards.
-- Game completion.
+- official room list
+- room membership and host
+- room password hash/salt
+- ready state
+- turn order and current turn
+- dice result validation
+- tile effects
+- score updates
+- mini/micro game timing and score submission rules
+- final game status
 
 Client owns:
 
-- UI state.
-- User input.
-- Firebase sign-in.
-- Displaying server snapshots.
+- UI screens
+- input controls
+- local mini/micro game interaction
+- Firebase sign-in flow
+- selected server URL
 
-The client sends intentions. It must not decide final gameplay results.
+The client may animate or preview locally, but final state should come from server snapshots.

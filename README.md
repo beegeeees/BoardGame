@@ -1,30 +1,30 @@
 # BoardGame
 
-Android board-game project rebuilt around Firebase Auth plus a custom WebSocket server.
+Android board-game project using Firebase Auth and a custom Java WebSocket server.
 
-Firebase is no longer used for Realtime Database gameplay state. The old RTDB controllers, services, storage classes, models, utilities, and rules file have been removed. Live room state and gameplay state now belong to the socket server.
+Firebase is used for Auth only. Live lobby, room, and gameplay state belongs to the socket server.
 
 ## Current Status
 
-This is still starter structure code, not a finished multiplayer game.
+This project now has the main multiplayer flow implemented: login, lobby, room creation/join, ready room, board screen, dice, tile effects, mini/micro game score submission, room passwords, ngrok WAN testing, and synchronization safeguards.
 
 Done:
 
 - `app`: Android debug UI with Firebase Auth helper and OkHttp WebSocket client.
 - `shared`: JSON socket protocol DTOs shared by app/server.
-- `socket-server`: JVM server using Java-WebSocket and Firebase Admin auth for room creation, joining, matchmaking, ready state, start game, dice rolls, starter tile effects, and starter mini/micro score flows.
+- `socket-server`: JVM server using Java-WebSocket and Firebase Admin auth for room creation, joining, ready state, start game, dice rolls, tile effects, and mini/micro score flows.
 - Balanced server layout: `GameSocketHandler`, `RoomService`, `BoardGameService`, `MiniGameService`, `MicroGameService`, `ScoreService`, and minimal models.
 - Removed old Firebase Realtime Database gameplay code and dependencies.
 - Added request IDs, basic errors, room/game broadcasts, and heartbeat messages.
+- Added room revisions, stale snapshot filtering, and stale command rejection for stronger client/server synchronization.
 - Prevented one verified Firebase UID from joining multiple active rooms at the same time.
 
-Still needed:
+Still not production-grade:
 
-- Manual Firebase service-account and device verification.
-- Reconnect/resume support.
-- Polished board-game rules on the server.
-- Final tile effects, mini games, micro games, scoring, and winner calculation.
-- Production hosting beyond temporary ngrok WAN testing.
+- reconnect/resume after app restart
+- persistent game storage
+- production hosting beyond temporary ngrok testing
+- rate limiting and operational monitoring
 
 ## Modules
 
@@ -97,7 +97,7 @@ wss://abc123.ngrok-free.app/game
 The debug client also has `Emu`, `LAN`, and `WAN` server preset buttons.
 After connecting, the log should show the server auth mode, network mode, and protocol version from `SERVER_HELLO`.
 
-See [WAN ngrok Guide](docs/WAN_NGROK_GUIDE.md).
+See [Server Setup And ngrok](docs/WAN_NGROK_GUIDE.md).
 
 ## Firebase Config
 
@@ -124,8 +124,6 @@ Dev auth bypasses Firebase token verification and is not safe for production.
 ## Docs
 
 - [Code Structure](docs/CODE_STRUCTURE.md)
-- [Code Walkthrough](docs/CODE_WALKTHROUGH.md)
-- [Socket Architecture](docs/SOCKET_ARCHITECTURE.md)
-- [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
-- [WAN ngrok Guide](docs/WAN_NGROK_GUIDE.md)
-- [Team Assignment](docs/TEAM_ASSIGNMENT.md)
+- [Game Overview](docs/GAME_OVERVIEW.md)
+- [Server Setup And ngrok](docs/WAN_NGROK_GUIDE.md)
+- [Synchronization Presentation](docs/SYNCHRONIZATION_PRESENTATION.md)

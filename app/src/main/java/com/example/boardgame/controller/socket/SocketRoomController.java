@@ -36,107 +36,138 @@ public class SocketRoomController {
         return socketClient.getState() == ConnectionState.CONNECTED;
     }
 
-    public void createRoom(String nickname, String firebaseIdToken, String roomPassword) {
+    public String createRoom(String nickname, String firebaseIdToken, String roomPassword) {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
-                commandBuilder(MessageTypes.CREATE_ROOM, nickname, firebaseIdToken)
+                commandBuilder(MessageTypes.CREATE_ROOM, requestId, nickname, firebaseIdToken)
                         .put("roomPassword", roomPassword)
                         .build()
         );
+        return requestId;
     }
 
-    public void joinRoom(String roomCode, String nickname, String firebaseIdToken, String roomPassword) {
+    public String joinRoom(String roomCode, String nickname, String firebaseIdToken, String roomPassword) {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
-                commandBuilder(MessageTypes.JOIN_ROOM, nickname, firebaseIdToken)
+                commandBuilder(MessageTypes.JOIN_ROOM, requestId, nickname, firebaseIdToken)
                         .put("roomCode", roomCode)
                         .put("roomPassword", roomPassword)
                         .build()
         );
+        return requestId;
     }
 
-    public void leaveRoom() {
+    public String leaveRoom() {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
                 SocketMessage.builder(MessageTypes.LEAVE_ROOM)
-                        .requestId(UUID.randomUUID().toString())
+                        .requestId(requestId)
                         .build()
         );
+        return requestId;
     }
 
-    public void setReady(boolean ready) {
+    public String setReady(boolean ready, long expectedRevision) {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
                 SocketMessage.builder(MessageTypes.SET_READY)
-                        .requestId(UUID.randomUUID().toString())
+                        .requestId(requestId)
                         .put("ready", ready)
+                        .put("expectedRevision", expectedRevision)
                         .build()
         );
+        return requestId;
     }
 
-    public void startGame() {
+    public String startGame(long expectedRevision) {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
                 SocketMessage.builder(MessageTypes.START_GAME)
-                        .requestId(UUID.randomUUID().toString())
+                        .requestId(requestId)
+                        .put("expectedRevision", expectedRevision)
                         .build()
         );
+        return requestId;
     }
 
-    public void rollDice(int diceRoll) {
+    public String rollDice(int diceRoll, long expectedRevision) {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
                 SocketMessage.builder(MessageTypes.ROLL_DICE)
-                        .requestId(UUID.randomUUID().toString())
+                        .requestId(requestId)
                         .put("diceRoll", diceRoll)
+                        .put("expectedRevision", expectedRevision)
                         .build()
         );
+        return requestId;
     }
 
-    public void applyTileEffect() {
+    public String applyTileEffect(long expectedRevision) {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
                 SocketMessage.builder(MessageTypes.APPLY_TILE_EFFECT)
-                        .requestId(UUID.randomUUID().toString())
+                        .requestId(requestId)
+                        .put("expectedRevision", expectedRevision)
                         .build()
         );
+        return requestId;
     }
 
-    public void startMiniGame(String miniGameType) {
+    public String startMiniGame(String miniGameType, long expectedRevision) {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
                 SocketMessage.builder(MessageTypes.START_MINI_GAME)
-                        .requestId(UUID.randomUUID().toString())
+                        .requestId(requestId)
                         .put("miniGameType", miniGameType)
+                        .put("expectedRevision", expectedRevision)
                         .build()
         );
+        return requestId;
     }
 
-    public void submitMiniGameScore(int score) {
+    public String submitMiniGameScore(int score, long expectedRevision) {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
                 SocketMessage.builder(MessageTypes.SUBMIT_MINI_GAME_SCORE)
-                        .requestId(UUID.randomUUID().toString())
+                        .requestId(requestId)
                         .put("score", score)
+                        .put("expectedRevision", expectedRevision)
                         .build()
         );
+        return requestId;
     }
 
-    public void finishMiniGame() {
+    public String finishMiniGame(long expectedRevision) {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
                 SocketMessage.builder(MessageTypes.FINISH_MINI_GAME)
-                        .requestId(UUID.randomUUID().toString())
+                        .requestId(requestId)
+                        .put("expectedRevision", expectedRevision)
                         .build()
         );
+        return requestId;
     }
 
-    public void submitMicroGameScore(int score) {
+    public String submitMicroGameScore(int score, long expectedRevision) {
+        String requestId = UUID.randomUUID().toString();
         socketClient.send(
                 SocketMessage.builder(MessageTypes.SUBMIT_MICRO_GAME_SCORE)
-                        .requestId(UUID.randomUUID().toString())
+                        .requestId(requestId)
                         .put("score", score)
+                        .put("expectedRevision", expectedRevision)
                         .build()
         );
+        return requestId;
     }
 
     private SocketMessage.Builder commandBuilder(
             String type,
+            String requestId,
             String nickname,
             String firebaseIdToken
     ) {
         return SocketMessage.builder(type)
-                .requestId(UUID.randomUUID().toString())
+                .requestId(requestId)
                 .put("nickname", nickname)
                 .put("firebaseIdToken", firebaseIdToken);
     }
