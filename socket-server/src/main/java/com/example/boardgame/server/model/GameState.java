@@ -67,10 +67,10 @@ public class GameState {
     }
 
     public void advanceRound() {
-        currentRound++;
-        if (currentRound > finalRound) {
+        if (currentRound >= finalRound) {
             transitionTo(FINISHED);
         } else {
+            currentRound++;
             currentPlayerIndex = 0;
             transitionTo(WAITING_FOR_ROLL);
         }

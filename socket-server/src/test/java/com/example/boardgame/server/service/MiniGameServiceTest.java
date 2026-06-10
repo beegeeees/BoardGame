@@ -69,8 +69,28 @@ public class MiniGameServiceTest {
 
         assertEquals(2, room.getGameState().getCurrentRound());
         assertEquals(GameState.WAITING_FOR_ROLL, room.getGameState().getTurnPhase());
-        assertEquals(30, room.getPlayer(playerId).getScore());
+        assertEquals(10, room.getPlayer(playerId).getScore());
         assertNull(room.getMiniGameState());
+    }
+
+    @Test
+    public void tiedMiniGameScoresReceiveTheSameReward() {
+        RoomService roomService = new RoomService();
+        Room room = roomService.createRoom("uid-1", "Host");
+        Player guest = roomService.joinRoom(room.getCode(), "uid-2", "Guest");
+        String hostId = room.getHostPlayerId();
+        roomService.setReady(room.getCode(), hostId, true);
+        roomService.setReady(room.getCode(), guest.getId(), true);
+        boardGameService.startGame(room, RoomService.MIN_PLAYERS);
+        moveToMiniGame(room);
+
+        miniGameService.startMiniGame(room);
+        miniGameService.submitMiniGameScore(room, hostId, 100);
+        miniGameService.submitMiniGameScore(room, guest.getId(), 100);
+        miniGameService.finishMiniGame(room);
+
+        assertEquals(10, room.getPlayer(hostId).getScore());
+        assertEquals(10, room.getPlayer(guest.getId()).getScore());
     }
 
     @Test
@@ -86,7 +106,30 @@ public class MiniGameServiceTest {
 
         assertEquals(Room.FINISHED, room.getStatus());
         assertEquals(GameState.FINISHED, room.getGameState().getTurnPhase());
+        assertEquals(3, room.getGameState().getCurrentRound());
         assertTrue(room.getGameState().getLastSystemMessage().contains("Winner: Player 1"));
+    }
+
+    @Test
+    public void finalScoreTieListsAllWinners() {
+        RoomService roomService = new RoomService();
+        Room room = roomService.createRoom("uid-1", "Host");
+        Player guest = roomService.joinRoom(room.getCode(), "uid-2", "Guest");
+        String hostId = room.getHostPlayerId();
+        roomService.setReady(room.getCode(), hostId, true);
+        roomService.setReady(room.getCode(), guest.getId(), true);
+        boardGameService.startGame(room, RoomService.MIN_PLAYERS);
+
+        for (int round = 1; round <= 3; round++) {
+            moveToMiniGame(room);
+            miniGameService.startMiniGame(room);
+            miniGameService.submitMiniGameScore(room, hostId, 100);
+            miniGameService.submitMiniGameScore(room, guest.getId(), 100);
+            miniGameService.finishMiniGame(room);
+        }
+
+        assertEquals(Room.FINISHED, room.getStatus());
+        assertTrue(room.getGameState().getLastSystemMessage().contains("Winners: Host, Guest"));
     }
 
     @Test

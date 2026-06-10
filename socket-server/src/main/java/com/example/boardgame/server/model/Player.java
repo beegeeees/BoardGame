@@ -12,6 +12,7 @@ public class Player {
     private final String nickname;
     private int score;
     private int position;
+    private int slotIndex = -1;
     private boolean ready;
     private boolean host;
 
@@ -56,6 +57,7 @@ public class Player {
                 nickname,
                 score,
                 position,
+                slotIndex,
                 ready,
                 host,
                 inMicroGame,
@@ -77,6 +79,9 @@ public class Player {
 
     // 특정 칸으로 강제 이동(워프)하는 경우를 대비
     public void setPosition(int position) { this.position = position; }
+
+    public int getSlotIndex() { return slotIndex; }
+    public void setSlotIndex(int slotIndex) { this.slotIndex = slotIndex; }
 
     public boolean isReady() { return ready; }
     public void setReady(boolean ready) { this.ready = ready; }

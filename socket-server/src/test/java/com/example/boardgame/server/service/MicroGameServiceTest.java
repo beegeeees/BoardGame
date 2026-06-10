@@ -40,6 +40,19 @@ public class MicroGameServiceTest {
     }
 
     @Test
+    public void failedMicroGameDeductsFivePointsAndAdvancesTurn() {
+        Room room = roomWaitingForMicroGame();
+        String playerId = room.getHostPlayerId();
+        microGameService.startMicroGame(room, playerId);
+
+        microGameService.submitMicroGameScore(room, playerId, -5);
+
+        assertEquals(-5, room.getPlayer(playerId).getScore());
+        assertFalse(room.getPlayer(playerId).isInMicroGame());
+        assertEquals(GameState.WAITING_FOR_MINI_GAME, room.getGameState().getTurnPhase());
+    }
+
+    @Test
     public void lateMicroGameScoreIsIgnoredButResolvesTurn() {
         Room room = roomWaitingForMicroGame();
         String playerId = room.getHostPlayerId();
@@ -67,8 +80,8 @@ public class MicroGameServiceTest {
         microGameService.startMicroGame(room, room.getHostPlayerId());
 
         try {
-            microGameService.submitMicroGameScore(room, room.getHostPlayerId(), -1);
-            fail("Expected negative score to be rejected");
+            microGameService.submitMicroGameScore(room, room.getHostPlayerId(), -6);
+            fail("Expected score below the failure penalty to be rejected");
         } catch (IllegalArgumentException expected) {
             assertEquals("Submitted score is out of range", expected.getMessage());
         }

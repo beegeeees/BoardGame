@@ -9,6 +9,7 @@ public class PlayerSnapshot {
     private final String nickname;
     private final int score;
     private final int position;
+    private final int slotIndex;
     private final boolean ready;
     private final boolean host;
 
@@ -25,10 +26,25 @@ public class PlayerSnapshot {
             boolean inMicroGame,
             List<String> itemCards
     ) {
+        this(id, nickname, score, position, -1, ready, host, inMicroGame, itemCards);
+    }
+
+    public PlayerSnapshot(
+            String id,
+            String nickname,
+            int score,
+            int position,
+            int slotIndex,
+            boolean ready,
+            boolean host,
+            boolean inMicroGame,
+            List<String> itemCards
+    ) {
         this.id = id == null ? "" : id;
         this.nickname = nickname == null ? "" : nickname;
         this.score = score;
         this.position = position;
+        this.slotIndex = slotIndex;
         this.ready = ready;
         this.host = host;
         this.inMicroGame = inMicroGame;
@@ -39,6 +55,7 @@ public class PlayerSnapshot {
     public String getNickname() { return nickname; }
     public int getScore() { return score; }
     public int getPosition() { return position; }
+    public int getSlotIndex() { return slotIndex; }
     public boolean isReady() { return ready; }
     public boolean isHost() { return host; }
 

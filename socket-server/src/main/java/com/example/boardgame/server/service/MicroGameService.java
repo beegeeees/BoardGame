@@ -8,6 +8,7 @@ import com.example.boardgame.server.model.Room;
 public class MicroGameService {
     public static final int MICRO_GAME_DURATION_MILLIS = 20_000;
     public static final int SUBMISSION_GRACE_MILLIS = 3_000;
+    public static final int MIN_SUBMITTED_SCORE = -5;
     public static final int MAX_SUBMITTED_SCORE = 1_000_000;
 
     private final BoardGameService boardGameService;
@@ -68,7 +69,7 @@ public class MicroGameService {
     }
 
     private void requireSubmittedScore(int score) {
-        if (score < 0 || score > MAX_SUBMITTED_SCORE) {
+        if (score < MIN_SUBMITTED_SCORE || score > MAX_SUBMITTED_SCORE) {
             throw new IllegalArgumentException("Submitted score is out of range");
         }
     }

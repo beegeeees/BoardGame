@@ -42,6 +42,10 @@ public class BoardActivity extends AppCompatActivity {
     private static final int BOARD_SIZE = 16;
     private static final int MAX_PLAYERS = 4;
     private static final int MICRO_GAME_SUCCESS_SCORE = 5;
+    private static final int MICRO_GAME_FAILURE_SCORE = -5;
+    private static final long TILE_EFFECT_DELAY_MILLIS = 650L;
+    private static final long AD_NOTICE_DELAY_MILLIS = 3_000L;
+    private static final long MINI_GAME_NOTICE_DELAY_MILLIS = 5_000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Random random = new Random();
@@ -65,14 +69,19 @@ public class BoardActivity extends AppCompatActivity {
     private String appliedTileKey = "";
     private String launchedMicroGameKey = "";
     private int requestedMiniGameRound = 0;
+    private int scheduledMiniGameRound = 0;
     private int launchedMiniGameRound = 0;
     private int submittedMiniGameRound = 0;
     private boolean finalDialogShown = false;
+    private Runnable pendingTileEffectRunnable;
+    private Runnable pendingMiniGameStartRunnable;
+    private AlertDialog phaseNoticeDialog;
 
     private final ServerSession.Listener serverListener = new ServerSession.Listener() {
         @Override
         public void onRoomUpdated(RoomSnapshot room) {
             renderBoard();
+            driveGamePhase();
         }
 
         @Override
@@ -116,6 +125,7 @@ public class BoardActivity extends AppCompatActivity {
         createScorePanels();
         btnDice.setOnClickListener(view -> {
             btnDice.setEnabled(false);
+            btnDice.setAlpha(0.40f);
             diceLauncher.launch(new Intent(this, DiceActivity.class));
         });
 
@@ -134,12 +144,14 @@ public class BoardActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         ServerSession.removeListener(serverListener);
+        cancelPendingPhaseActions();
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        dismissPhaseNotice();
         super.onDestroy();
     }
 
@@ -169,7 +181,9 @@ public class BoardActivity extends AppCompatActivity {
             boolean success = result.getResultCode() == RESULT_OK
                     && result.getData() != null
                     && result.getData().getBooleanExtra(GameContract.EXTRA_SUCCESS, false);
-            ServerSession.submitMicroGameScore(success ? MICRO_GAME_SUCCESS_SCORE : 0);
+            ServerSession.submitMicroGameScore(
+                    success ? MICRO_GAME_SUCCESS_SCORE : MICRO_GAME_FAILURE_SCORE
+            );
         });
 
         miniGameLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -196,16 +210,18 @@ public class BoardActivity extends AppCompatActivity {
         if (room == null) {
             txtTurnInfo.setText("게임 정보를 기다리는 중");
             btnDice.setEnabled(false);
+            btnDice.setAlpha(0.40f);
             return;
         }
 
         List<PlayerSnapshot> players = room.getPlayers();
+        PlayerSnapshot[] playersBySlot = playersBySlot(players);
         for (int i = 0; i < MAX_PLAYERS; i++) {
-            boolean visible = i < players.size();
+            PlayerSnapshot player = playersBySlot[i];
+            boolean visible = player != null;
             playerViews[i].setVisibility(visible ? View.VISIBLE : View.GONE);
             scorePanels[i].setVisibility(visible ? View.VISIBLE : View.GONE);
             if (visible) {
-                PlayerSnapshot player = players.get(i);
                 movePlayerToTile(playerViews[i], player.getPosition(), i);
                 renderScorePanel(scorePanels[i], player, i, isCurrentPlayer(game, player.getId()));
             } else {
@@ -219,15 +235,19 @@ public class BoardActivity extends AppCompatActivity {
             txtDiceVisual.setText("?");
             txtTurnInfo.setText("게임 시작 대기 중");
             btnDice.setEnabled(false);
+            btnDice.setAlpha(0.40f);
             return;
         }
 
         txtDiceVisual.setText(game.getLastDiceRoll() > 0 ? String.valueOf(game.getLastDiceRoll()) : "?");
         txtTurnInfo.setText(turnText(room, game));
-        btnDice.setEnabled(isMyTurn(game) && "WAITING_FOR_ROLL".equals(game.getTurnPhase()));
+        boolean isDiceEnabled = isMyTurn(game) && "WAITING_FOR_ROLL".equals(game.getTurnPhase());
+        btnDice.setEnabled(isDiceEnabled);
+        btnDice.setAlpha(isDiceEnabled ? 1.0f : 0.40f);
 
         if ("FINISHED".equals(game.getTurnPhase())) {
             btnDice.setEnabled(false);
+            btnDice.setAlpha(0.40f);
             showFinalRanking(room);
         }
     }
@@ -243,7 +263,21 @@ public class BoardActivity extends AppCompatActivity {
             String key = game.getCurrentRound() + ":" + game.getCurrentPlayerId() + ":" + game.getLastDiceRoll();
             if (!key.equals(appliedTileKey)) {
                 appliedTileKey = key;
-                handler.postDelayed(ServerSession::applyTileEffect, 650L);
+                long delayMillis = TILE_EFFECT_DELAY_MILLIS;
+                PlayerSnapshot currentPlayer = findPlayer(
+                        ServerSession.getLatestRoomSnapshot(),
+                        game.getCurrentPlayerId()
+                );
+                if (currentPlayer != null && isAdTile(currentPlayer.getPosition())) {
+                    showPhaseNotice(getString(R.string.board_ad_notice));
+                    delayMillis = AD_NOTICE_DELAY_MILLIS;
+                }
+                pendingTileEffectRunnable = () -> {
+                    pendingTileEffectRunnable = null;
+                    dismissPhaseNotice();
+                    ServerSession.applyTileEffect();
+                };
+                handler.postDelayed(pendingTileEffectRunnable, delayMillis);
             }
             return;
         }
@@ -257,16 +291,27 @@ public class BoardActivity extends AppCompatActivity {
             return;
         }
 
-        if ("WAITING_FOR_MINI_GAME".equals(phase) && isHost()
-                && requestedMiniGameRound != game.getCurrentRound()) {
-            requestedMiniGameRound = game.getCurrentRound();
-            ServerSession.startMiniGame(miniGameType(game.getCurrentRound()));
+        if ("WAITING_FOR_MINI_GAME".equals(phase)) {
+            if (requestedMiniGameRound != game.getCurrentRound()) {
+                requestedMiniGameRound = game.getCurrentRound();
+                showPhaseNotice(getString(R.string.board_minigame_notice));
+            }
+            if (!isHost() || scheduledMiniGameRound == game.getCurrentRound()) {
+                return;
+            }
+            scheduledMiniGameRound = game.getCurrentRound();
+            pendingMiniGameStartRunnable = () -> {
+                pendingMiniGameStartRunnable = null;
+                ServerSession.startMiniGame(miniGameType(game.getCurrentRound()));
+            };
+            handler.postDelayed(pendingMiniGameStartRunnable, MINI_GAME_NOTICE_DELAY_MILLIS);
             return;
         }
 
         if ("MINI_GAME_RUNNING".equals(phase)
                 && launchedMiniGameRound != game.getCurrentRound()) {
             launchedMiniGameRound = game.getCurrentRound();
+            dismissPhaseNotice();
             miniGameLauncher.launch(miniGameIntent(game.getCurrentRound()));
         }
     }
@@ -316,6 +361,7 @@ public class BoardActivity extends AppCompatActivity {
 
     private void renderScorePanel(TextView panel, PlayerSnapshot player, int index, boolean active) {
         String turnLabel = active ? "  ▶ 턴" : "";
+        String meBadge = player.getId().equals(ServerSession.getCurrentPlayerId()) ? " [나]" : "";
         panel.bringToFront();
         panel.setBackground(createScorePanelBackground(index, active));
         panel.setElevation(active ? dp(22) : dp(14));
@@ -326,7 +372,7 @@ public class BoardActivity extends AppCompatActivity {
                 .scaleY(active ? 1.04f : 1.0f)
                 .setDuration(160L)
                 .start();
-        panel.setText(player.getNickname() + turnLabel + "\n" + player.getScore() + "점");
+        panel.setText(player.getNickname() + meBadge + turnLabel + "\n" + player.getScore() + "점");
     }
 
     private GradientDrawable createScorePanelBackground(int playerIndex, boolean active) {
@@ -488,6 +534,47 @@ public class BoardActivity extends AppCompatActivity {
         handler.postDelayed(ServerSession::finishMiniGame, 3000L);
     }
 
+    private void showPhaseNotice(String message) {
+        dismissPhaseNotice();
+        phaseNoticeDialog = new AlertDialog.Builder(this)
+                .setMessage(message)
+                .setCancelable(false)
+                .create();
+        phaseNoticeDialog.show();
+    }
+
+    private void dismissPhaseNotice() {
+        if (phaseNoticeDialog != null) {
+            if (phaseNoticeDialog.isShowing()) {
+                phaseNoticeDialog.dismiss();
+            }
+            phaseNoticeDialog = null;
+        }
+    }
+
+    private void cancelPendingPhaseActions() {
+        if (pendingTileEffectRunnable != null) {
+            handler.removeCallbacks(pendingTileEffectRunnable);
+            pendingTileEffectRunnable = null;
+            appliedTileKey = "";
+        }
+        if (pendingMiniGameStartRunnable != null) {
+            handler.removeCallbacks(pendingMiniGameStartRunnable);
+            pendingMiniGameStartRunnable = null;
+        }
+        GameSnapshot game = ServerSession.getLatestGameSnapshot();
+        if (game != null && "WAITING_FOR_MINI_GAME".equals(game.getTurnPhase())) {
+            requestedMiniGameRound = 0;
+            scheduledMiniGameRound = 0;
+        }
+        dismissPhaseNotice();
+    }
+
+    private boolean isAdTile(int position) {
+        int tileIndex = Math.floorMod(position, BOARD_SIZE);
+        return tileIndex == 6 || tileIndex == 14;
+    }
+
     private String turnText(RoomSnapshot room, GameSnapshot game) {
         PlayerSnapshot current = findPlayer(room, game.getCurrentPlayerId());
         String name = current == null ? "알 수 없음" : current.getNickname();
@@ -495,7 +582,8 @@ public class BoardActivity extends AppCompatActivity {
         if (message == null || message.trim().isEmpty()) {
             message = game.getTurnPhase();
         }
-        return "라운드 " + game.getCurrentRound() + "/" + game.getFinalRound()
+        int displayedRound = Math.min(game.getCurrentRound(), game.getFinalRound());
+        return "라운드 " + displayedRound + "/" + game.getFinalRound()
                 + " | 현재 턴 " + name + "\n" + message;
     }
 
@@ -530,11 +618,39 @@ public class BoardActivity extends AppCompatActivity {
             return 0;
         }
         for (int i = 0; i < room.getPlayers().size(); i++) {
-            if (room.getPlayers().get(i).getId().equals(playerId)) {
-                return i;
+            PlayerSnapshot player = room.getPlayers().get(i);
+            if (player.getId().equals(playerId)) {
+                return validSlotIndex(player.getSlotIndex()) ? player.getSlotIndex() : i;
             }
         }
         return 0;
+    }
+
+    private PlayerSnapshot[] playersBySlot(List<PlayerSnapshot> players) {
+        PlayerSnapshot[] result = new PlayerSnapshot[MAX_PLAYERS];
+        for (PlayerSnapshot player : players) {
+            int slotIndex = player.getSlotIndex();
+            if (!validSlotIndex(slotIndex) || result[slotIndex] != null) {
+                slotIndex = firstEmptySlot(result);
+            }
+            if (validSlotIndex(slotIndex)) {
+                result[slotIndex] = player;
+            }
+        }
+        return result;
+    }
+
+    private int firstEmptySlot(PlayerSnapshot[] players) {
+        for (int i = 0; i < players.length; i++) {
+            if (players[i] == null) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private boolean validSlotIndex(int slotIndex) {
+        return slotIndex >= 0 && slotIndex < MAX_PLAYERS;
     }
 
     private void showFinalRanking(RoomSnapshot room) {
@@ -546,11 +662,24 @@ public class BoardActivity extends AppCompatActivity {
         ranking.sort(Comparator.comparingInt(PlayerSnapshot::getScore).reversed());
 
         StringBuilder message = new StringBuilder();
+        int rank = 1;
         for (int i = 0; i < ranking.size(); i++) {
             PlayerSnapshot player = ranking.get(i);
-            message.append(i + 1)
+            if (i > 0 && player.getScore() < ranking.get(i - 1).getScore()) {
+                rank = i + 1;
+            }
+            boolean isTie = (i > 0 && player.getScore() == ranking.get(i - 1).getScore())
+                    || (i < ranking.size() - 1
+                    && player.getScore() == ranking.get(i + 1).getScore());
+            String meSuffix = player.getId().equals(ServerSession.getCurrentPlayerId())
+                    ? " [나]"
+                    : "";
+
+            message.append(isTie ? "공동 " : "")
+                    .append(rank)
                     .append("위 ")
                     .append(player.getNickname())
+                    .append(meSuffix)
                     .append(" - ")
                     .append(player.getScore())
                     .append("점\n");

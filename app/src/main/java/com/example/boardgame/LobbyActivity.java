@@ -191,15 +191,38 @@ public class LobbyActivity extends AppCompatActivity {
 
     private void renderRoomSnapshot(RoomSnapshot room) {
         List<PlayerSlot> slots = new ArrayList<>();
-        for (PlayerSnapshot player : room.getPlayers()) {
-            slots.add(new PlayerSlot(player.getNickname(), player.isHost(), player.isReady(), player.getId()));
-        }
         while (slots.size() < 4) {
             slots.add(PlayerSlot.empty());
+        }
+        for (int i = 0; i < room.getPlayers().size(); i++) {
+            PlayerSnapshot player = room.getPlayers().get(i);
+            int slotIndex = validSlotIndex(player.getSlotIndex()) ? player.getSlotIndex() : i;
+            if (validSlotIndex(slotIndex)) {
+                slots.set(slotIndex, new PlayerSlot(
+                        player.getNickname(),
+                        player.isHost(),
+                        player.isReady(),
+                        player.getId()
+                ));
+            }
         }
         renderSlots(slots);
         updateRoomMeta(room);
         updateStartButtonState(false, room);
+
+        PlayerSnapshot me = findMe(room);
+        if (me != null) {
+            int mySlotIndex = validSlotIndex(me.getSlotIndex())
+                    ? me.getSlotIndex()
+                    : room.getPlayers().indexOf(me);
+            roomCodeText.setText(getString(
+                    R.string.lobby_room_code_with_player,
+                    roomCode,
+                    mySlotIndex + 1
+            ));
+        } else {
+            roomCodeText.setText(getString(R.string.lobby_room_code, roomCode));
+        }
     }
 
     private void renderEmptyRoom() {
@@ -208,6 +231,7 @@ public class LobbyActivity extends AppCompatActivity {
             slots.add(PlayerSlot.empty());
         }
         renderSlots(slots);
+        roomCodeText.setText(getString(R.string.lobby_room_code, roomCode));
         roomMetaText.setText(getString(R.string.lobby_room_meta, 0, 4, 0));
         startButton.setEnabled(false);
         renderStartButtonVisualState(false, false);
@@ -232,11 +256,17 @@ public class LobbyActivity extends AppCompatActivity {
             }
 
             stateView.setVisibility(View.VISIBLE);
+            String displayName;
             if (slot.host) {
-                nameView.setText(getString(R.string.lobby_slot_host_format, slot.nickname));
+                displayName = getString(R.string.lobby_slot_host_format, slot.nickname);
             } else {
-                nameView.setText(slot.nickname);
+                displayName = slot.nickname;
             }
+            if (!slot.playerId.isEmpty()
+                    && slot.playerId.equals(ServerSession.getCurrentPlayerId())) {
+                displayName = getString(R.string.lobby_slot_me_format, displayName);
+            }
+            nameView.setText(displayName);
 
             stateView.setText(getString(slot.ready ? R.string.lobby_status_ready : R.string.lobby_status_waiting));
             stateView.setBackgroundResource(slot.ready ? R.drawable.bg_status_ready : R.drawable.bg_status_waiting);
@@ -312,11 +342,16 @@ public class LobbyActivity extends AppCompatActivity {
     }
 
     private void animateMySlot(String playerId, RoomSnapshot room) {
-        for (int i = 0; i < room.getPlayers().size() && i < slotCards.length; i++) {
-            if (!room.getPlayers().get(i).getId().equals(playerId)) {
+        for (int i = 0; i < room.getPlayers().size(); i++) {
+            PlayerSnapshot player = room.getPlayers().get(i);
+            if (!player.getId().equals(playerId)) {
                 continue;
             }
-            View card = slotCards[i];
+            int slotIndex = validSlotIndex(player.getSlotIndex()) ? player.getSlotIndex() : i;
+            if (!validSlotIndex(slotIndex)) {
+                return;
+            }
+            View card = slotCards[slotIndex];
             card.animate().cancel();
             ObjectAnimator animator = ObjectAnimator.ofFloat(
                     card,
@@ -342,6 +377,10 @@ public class LobbyActivity extends AppCompatActivity {
             }
         }
         return null;
+    }
+
+    private boolean validSlotIndex(int slotIndex) {
+        return slotIndex >= 0 && slotIndex < slotCards.length;
     }
 
     private ArrayList<String> playersFromLatestRoom() {

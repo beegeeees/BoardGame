@@ -28,6 +28,21 @@ public class ScoreServiceTest {
     }
 
     @Test
+    public void rankScoresGivesTiedPlayersTheSameReward() {
+        ScoreService scoreService = new ScoreService();
+        Map<String, Integer> rawScores = new LinkedHashMap<>();
+        rawScores.put("player-1", 100);
+        rawScores.put("player-2", 100);
+        rawScores.put("player-3", 50);
+
+        Map<String, Integer> rewards = scoreService.rankScores(rawScores, new int[]{10, 7, 5, 3});
+
+        assertEquals(Integer.valueOf(10), rewards.get("player-1"));
+        assertEquals(Integer.valueOf(10), rewards.get("player-2"));
+        assertEquals(Integer.valueOf(5), rewards.get("player-3"));
+    }
+
+    @Test
     public void finalRankingsSortPlayersByTotalScore() {
         Room room = new Room("123456");
         Player first = new Player("player-1", "uid-1", "First");

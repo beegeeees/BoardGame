@@ -6,6 +6,7 @@ import com.example.boardgame.server.model.Room;
 
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 public class BoardGameService {
@@ -39,7 +40,9 @@ public class BoardGameService {
 
         GameState gameState = new GameState(room.getCode(), FINAL_ROUND);
         List<String> turnOrder = new ArrayList<>();
-        for (Player player : room.getPlayerList()) {
+        List<Player> playersBySlot = new ArrayList<>(room.getPlayerList());
+        playersBySlot.sort(Comparator.comparingInt(Player::getSlotIndex));
+        for (Player player : playersBySlot) {
             turnOrder.add(player.getId());
         }
         gameState.setTurnOrder(turnOrder);

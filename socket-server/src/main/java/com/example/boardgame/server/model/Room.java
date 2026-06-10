@@ -41,12 +41,38 @@ public class Room {
     }
 
     public void addPlayer(Player player) {
+        if (player.getSlotIndex() < 0) {
+            player.setSlotIndex(nextAvailableSlot());
+        }
         players.put(player.getId(), player);
         if (hostPlayerId.isEmpty()) {
             hostPlayerId = player.getId();
             player.setHost(true);
         }
         touch();
+    }
+
+    private int nextAvailableSlot() {
+        boolean[] occupied = new boolean[4];
+        int highestOccupiedSlot = -1;
+        for (Player existing : players.values()) {
+            int slotIndex = existing.getSlotIndex();
+            if (slotIndex >= 0 && slotIndex < occupied.length) {
+                occupied[slotIndex] = true;
+                highestOccupiedSlot = Math.max(highestOccupiedSlot, slotIndex);
+            }
+        }
+        for (int i = highestOccupiedSlot + 1; i < occupied.length; i++) {
+            if (!occupied[i]) {
+                return i;
+            }
+        }
+        for (int i = 0; i < occupied.length; i++) {
+            if (!occupied[i]) {
+                return i;
+            }
+        }
+        throw new IllegalStateException("Room has no available player slot");
     }
 
     public void removePlayer(String playerId) {

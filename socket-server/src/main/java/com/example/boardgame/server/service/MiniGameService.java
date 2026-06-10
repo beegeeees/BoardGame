@@ -5,13 +5,14 @@ import com.example.boardgame.server.model.MiniGameState;
 import com.example.boardgame.server.model.Player;
 import com.example.boardgame.server.model.Room;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class MiniGameService {
     public static final int MINI_GAME_DURATION_MILLIS = 240_000;
     public static final int SUBMISSION_GRACE_MILLIS = 5_000;
-    public static final int[] MINI_GAME_SCORE_BY_RANK = {30, 20, 10, 5};
+    public static final int[] MINI_GAME_SCORE_BY_RANK = {10, 7, 5, 3};
     public static final int MAX_SUBMITTED_SCORE = 1_000_000;
 
     private final BoardGameService boardGameService;
@@ -86,8 +87,18 @@ public class MiniGameService {
         if (rankings.isEmpty()) {
             return "Game finished.";
         }
-        Player winner = rankings.get(0);
-        return "Game finished. Winner: " + winner.getNickname() + " (" + winner.getScore() + ").";
+        int winningScore = rankings.get(0).getScore();
+        List<String> winnerNames = new ArrayList<>();
+        for (Player player : rankings) {
+            if (player.getScore() != winningScore) {
+                break;
+            }
+            winnerNames.add(player.getNickname());
+        }
+        String label = winnerNames.size() > 1 ? "Winners: " : "Winner: ";
+        return "Game finished. " + label
+                + String.join(", ", winnerNames)
+                + " (" + winningScore + ").";
     }
 
     private MiniGameState requireMiniGame(Room room) {

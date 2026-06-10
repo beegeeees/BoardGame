@@ -11,16 +11,16 @@
     <string-array name="title_rules_pages_v2">
         <item>[1] 게임 소개\n불편마불은 2~4인이 함께 플레이하는 멀티플레이 보드게임입니다.\n플레이어는 보드판 이동과 미니게임 경쟁으로 점수를 얻고,\n총 3라운드 종료 후 최고 점수 플레이어가 승리합니다.</item>
         <item>[2] 게임 진행 방식\n1. 플레이어 순서대로 턴 진행\n2. 모든 플레이어 턴 종료\n3. 미니게임 진행\n4. 점수 반영\n5. 다음 라운드 진행\n\n이 흐름을 3라운드 반복합니다.</item>
-        <item>[3] 플레이어 턴\n한 플레이어의 턴 순서:\n1) 카드 사용\n2) 주사위 굴리기\n3) 말 이동\n4) 칸 효과 적용\n5) 턴 종료</item>
+        <item>[3] 플레이어 턴\n한 플레이어의 턴 순서:\n1) 주사위 굴리기\n2) 말 이동\n3) 칸 효과 적용\n4) 턴 종료\n\n방어 카드는 감점 칸에 도착하면 자동으로 사용됩니다.</item>
         <item>[4] 주사위 시스템\n주사위는 1~6 범위에서 나옵니다.\n버튼 선택으로 범위를 어느 정도 조절할 수 있습니다.\n- 1~2 버튼\n- 3~4 버튼\n- 5~6 버튼\n- 랜덤 버튼\n\n일정 확률로 버튼이 섞이거나 가려지는 UI 기믹이 등장합니다.</item>
         <item>[5] 점수 규칙\n이동한 칸 수만큼 기본 점수를 얻습니다.\n예: 1칸=+1점, 6칸=+6점\n\n추가로 도착 칸 효과가 반영되며,\n점수는 음수가 될 수 있습니다.</item>
         <item>[6] 보드판 구성\n보드판은 총 16칸입니다.\n\n칸 종류:\n- 시작 칸(도착 시 +5)\n- 점수 칸(+3)\n- 감점 칸(-3)\n- 물음표 칸(랜덤 이벤트)\n- 카드 칸(카드 1장 획득)\n- 광고 칸(짧은 미니게임)</item>
-        <item>[7] 물음표/광고 칸\n물음표 칸 예시 이벤트:\n- 점수 교환\n- 위치 교환\n- 다음 주사위 강화\n- 전체 플레이어 점수 변화\n\n광고 칸:\n- 성공 시 +5점\n- 실패 시 -5점</item>
-        <item>[8] 카드 종류\n- 방어권 카드: 다음 감점 효과 방어\n- 10 주사위 카드: 주사위 범위 1~10\n- 456 주사위 카드: 4~6만 등장\n- 홀짝 주사위 카드: 홀수/짝수 강제\n- 광고 스킵 카드: 광고 칸 건너뜀</item>
+        <item>[7] 물음표/광고 칸\n물음표 칸:\n- 무작위로 +5점 또는 -5점\n\n광고 칸:\n- 성공 시 +5점\n- 실패 시 -5점</item>
+        <item>[8] 카드\n현재 구현된 카드는 방어권 카드입니다.\n카드 칸에서 획득할 수 있으며,\n다음 감점 칸의 -3점 효과를 자동으로 방어합니다.</item>
         <item>[9] 미니게임\n모든 플레이어 턴이 끝나면 미니게임이 시작됩니다.\n종류:\n1) 색상 캡챠\n2) 비밀번호 생성\n3) 볼륨 미로</item>
         <item>[10] 미니게임 점수\n순위별 점수:\n1위 +10\n2위 +7\n3위 +5\n4위 +3\n실패 0</item>
-        <item>[11] 승리 조건\n3라운드 종료 후 최고 점수 플레이어 승리.\n동점일 경우:\n1) 미니게임 1위 횟수\n2) 평균 미니게임 순위\n3) 마지막 미니게임 순위\n그래도 같으면 공동 승리</item>
-        <item>[12] 게임 특징\n- 불편한 UI 기믹\n- 빠른 멀티플레이 진행\n- 카드 + 랜덤 이벤트 중심\n- 미니게임 경쟁 요소\n- 점수 기반 승리 시스템</item>
+        <item>[11] 승리 조건\n3라운드 종료 후 총점이 가장 높은 플레이어가 승리합니다.\n총점이 같으면 공동 순위로 표시됩니다.</item>
+        <item>[12] 게임 특징\n- 불편한 UI 기믹\n- 빠른 멀티플레이 진행\n- 보드 칸 효과\n- 미니게임 경쟁 요소\n- 점수 기반 승리 시스템</item>
     </string-array>
     <string name="nickname_title">게스트 로그인</string>
     <string name="nickname_guide">닉네임을 정하고 바로 방 목록으로 이동합니다.</string>
@@ -41,6 +41,7 @@
     <string name="lobby_list_empty">현재 입장 가능한 방이 없습니다.</string>
     <string name="lobby_list_code_hint">방 코드 입력 (예 111111)</string>
     <string name="lobby_list_password_hint">비밀번호 (선택)</string>
+    <string name="lobby_list_password_input_hint">비밀번호 입력</string>
     <string name="lobby_list_join_code">코드입장</string>
     <string name="lobby_list_code_required">방 코드를 입력하세요.</string>
     <string name="lobby_list_create_dialog_title">방 생성</string>
@@ -53,8 +54,10 @@
     <string name="room_count_format">인원 %1$d/%2$d</string>
     <string name="lobby_header">대기방</string>
     <string name="lobby_room_code">방 코드: %1$s</string>
+    <string name="lobby_room_code_with_player">방 코드: %1$s [%2$dP]</string>
     <string name="lobby_room_meta">인원 %1$d/%2$d • 준비 %3$d명</string>
     <string name="lobby_slot_host_format">[방장] %1$s</string>
+    <string name="lobby_slot_me_format">%1$s [나]</string>
     <string name="lobby_status_waiting">준비중</string>
     <string name="lobby_status_ready">준비완료</string>
     <string name="lobby_start_button">시작</string>
@@ -66,6 +69,8 @@
     <string name="lobby_leave_button">방 나가기</string>
     <string name="lobby_room_join">입장</string>
     <string name="board_screen_title">불편마불 보드판</string>
+    <string name="board_ad_notice">잠시 후 광고 미니게임이 시작됩니다...</string>
+    <string name="board_minigame_notice">잠시 후 라운드 미니게임이 시작됩니다...</string>
     <string name="board_demo_title">보드 화면</string>
     <string name="board_participants_title">참여 플레이어</string>
     <string name="board_start_countdown">%1$d초 뒤 게임이 시작됩니다...</string>

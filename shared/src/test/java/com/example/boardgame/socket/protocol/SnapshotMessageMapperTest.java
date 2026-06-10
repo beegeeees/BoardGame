@@ -18,8 +18,8 @@ public class SnapshotMessageMapperTest {
                 "WAITING",
                 7L,
                 Arrays.asList(
-                        new PlayerSnapshot("player-1", "Host", 10, 3, true, true, false, Collections.emptyList()),
-                        new PlayerSnapshot("player-2", "Guest", 4, 1, false, false, false, Collections.emptyList())
+                        new PlayerSnapshot("player-1", "Host", 10, 3, 0, true, true, false, Collections.emptyList()),
+                        new PlayerSnapshot("player-2", "Guest", 4, 1, 1, false, false, false, Collections.emptyList())
                 )
         );
 
@@ -36,6 +36,7 @@ public class SnapshotMessageMapperTest {
         assertEquals(2, parsed.getPlayers().size());
         assertEquals("Guest", parsed.getPlayers().get(1).getNickname());
         assertEquals(4, parsed.getPlayers().get(1).getScore());
+        assertEquals(1, parsed.getPlayers().get(1).getSlotIndex());
     }
 
     @Test

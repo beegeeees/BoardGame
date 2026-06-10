@@ -17,17 +17,16 @@ public class ScoreService {
     public Map<String, Integer> rankScores(Map<String, Integer> rawScoresByPlayerId, int[] rewardsByRank) {
         List<Map.Entry<String, Integer>> entries = new ArrayList<>(rawScoresByPlayerId.entrySet());
 
-        // 1. 점수 기준 내림차순 정렬 (점수가 높을수록 앞쪽인 1등으로)
-        //
-        // 자바의 List.sort()는 '안정 정렬(Stable Sort)'을 사용합니다.
-        // 따라서 점수가 똑같을 경우, LinkedHashMap에 먼저 데이터가 들어간 사람
-        // (즉, 네트워크상 점수를 먼저 서버로 보낸 사람)이 더 높은 등수를 차지하게 됩니다.
+        // 점수가 높은 순으로 정렬하되, 같은 점수는 같은 순위 보상을 받습니다.
         entries.sort((first, second) -> Integer.compare(second.getValue(), first.getValue()));
 
         Map<String, Integer> rewards = new LinkedHashMap<>();
+        int rankIndex = 0;
         for (int i = 0; i < entries.size(); i++) {
-            // 2. 등수에 맞는 보상 매핑 (만약 4명인데 보상 배열이 3개뿐이면 4등은 0점 처리하는 안전장치)
-            int reward = i < rewardsByRank.length ? rewardsByRank[i] : 0;
+            if (i > 0 && !entries.get(i).getValue().equals(entries.get(i - 1).getValue())) {
+                rankIndex = i;
+            }
+            int reward = rankIndex < rewardsByRank.length ? rewardsByRank[rankIndex] : 0;
             rewards.put(entries.get(i).getKey(), reward);
         }
         return rewards;

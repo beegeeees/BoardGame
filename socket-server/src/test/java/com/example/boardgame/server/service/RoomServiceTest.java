@@ -112,6 +112,20 @@ public class RoomServiceTest {
     }
 
     @Test
+    public void disconnectDoesNotRenumberRemainingPlayerSlots() {
+        RoomService roomService = new RoomService();
+        Room room = roomService.createRoom("uid-1", "Host");
+        String originalHostId = room.getHostPlayerId();
+        Player secondPlayer = roomService.joinRoom(room.getCode(), "uid-2", "Guest");
+
+        roomService.disconnect(room.getCode(), originalHostId);
+        Player thirdPlayer = roomService.joinRoom(room.getCode(), "uid-3", "New Guest");
+
+        assertEquals(1, secondPlayer.getSlotIndex());
+        assertEquals(2, thirdPlayer.getSlotIndex());
+    }
+
+    @Test
     public void disconnectCurrentPlayerInGameSkipsToNextPlayer() {
         RoomService roomService = new RoomService();
         BoardGameService boardGameService = new BoardGameService();

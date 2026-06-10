@@ -110,6 +110,7 @@ public final class SnapshotMessageMapper {
         player.addProperty("nickname", snapshot.getNickname());
         player.addProperty("score", snapshot.getScore());
         player.addProperty("position", snapshot.getPosition());
+        player.addProperty("slotIndex", snapshot.getSlotIndex());
         player.addProperty("ready", snapshot.isReady());
         player.addProperty("host", snapshot.isHost());
         player.addProperty("inMicroGame", snapshot.isInMicroGame());
@@ -158,6 +159,7 @@ public final class SnapshotMessageMapper {
                     string(player, "nickname"),
                     integer(player, "score", 0),
                     integer(player, "position", 0),
+                    integer(player, "slotIndex", -1),
                     bool(player, "ready", false),
                     bool(player, "host", false),
                     bool(player, "inMicroGame", false),
