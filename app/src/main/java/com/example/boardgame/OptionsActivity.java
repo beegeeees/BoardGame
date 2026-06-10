@@ -1,25 +1,16 @@
 package com.example.boardgame;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.CompoundButton;
 import android.widget.EditText;
-import android.widget.RadioButton;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 public class OptionsActivity extends AppCompatActivity {
-    private TextView volumeValueText;
-    private CheckBox easyVolumeCheck;
-    private Switch soundEffectsSwitch;
-    private Switch vibrationSwitch;
-    private RadioButton diceSpeedNormal;
-    private RadioButton diceSpeedFast;
-    private Switch debugModeSwitch;
+    private TextView nicknameValueText;
     private EditText serverUrlInput;
 
     @Override
@@ -27,49 +18,19 @@ public class OptionsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_options);
 
-        volumeValueText = findViewById(R.id.volumeValueText);
-        easyVolumeCheck = findViewById(R.id.easyVolumeCheck);
-        soundEffectsSwitch = findViewById(R.id.soundEffectsSwitch);
-        vibrationSwitch = findViewById(R.id.vibrationSwitch);
-        diceSpeedNormal = findViewById(R.id.diceSpeedNormal);
-        diceSpeedFast = findViewById(R.id.diceSpeedFast);
-        debugModeSwitch = findViewById(R.id.debugModeSwitch);
+        nicknameValueText = findViewById(R.id.nicknameValueText);
         serverUrlInput = findViewById(R.id.serverUrlInput);
 
-        Button minusButton = findViewById(R.id.volumeMinusButton);
-        Button plusButton = findViewById(R.id.volumePlusButton);
+        Button changeNicknameButton = findViewById(R.id.changeNicknameButton);
         Button saveServerUrlButton = findViewById(R.id.saveServerUrlButton);
         Button useLanServerButton = findViewById(R.id.useLanServerButton);
         Button useWanServerButton = findViewById(R.id.useWanServerButton);
         Button closeButton = findViewById(R.id.closeOptionsButton);
 
-        minusButton.setOnClickListener(view -> updateVolumeBy(-1));
-        plusButton.setOnClickListener(view -> updateVolumeBy(1));
+        changeNicknameButton.setOnClickListener(
+                view -> startActivity(new Intent(this, NicknameActivity.class))
+        );
         closeButton.setOnClickListener(view -> finish());
-
-        easyVolumeCheck.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (isChecked) {
-                buttonView.setChecked(false);
-                Toast.makeText(this, R.string.options_easy_volume_locked, Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        soundEffectsSwitch.setOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) ->
-                SessionPrefs.setSoundEffectsOn(this, isChecked));
-        vibrationSwitch.setOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) ->
-                SessionPrefs.setVibrationOn(this, isChecked));
-        diceSpeedNormal.setOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) -> {
-            if (isChecked) {
-                SessionPrefs.setDiceFast(this, false);
-            }
-        });
-        diceSpeedFast.setOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) -> {
-            if (isChecked) {
-                SessionPrefs.setDiceFast(this, true);
-            }
-        });
-        debugModeSwitch.setOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) ->
-                SessionPrefs.setDebugMode(this, isChecked));
 
         saveServerUrlButton.setOnClickListener(view -> saveServerUrlFromInput());
         useLanServerButton.setOnClickListener(view -> {
@@ -87,30 +48,15 @@ public class OptionsActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        renderVolume();
-        renderExtraOptions();
+        renderNickname();
         renderServerUrl();
-        easyVolumeCheck.setChecked(false);
     }
 
-    private void updateVolumeBy(int delta) {
-        SessionPrefs.setVolume(this, SessionPrefs.getVolume(this) + delta);
-        renderVolume();
-    }
-
-    private void renderVolume() {
-        volumeValueText.setText(getString(R.string.options_volume_value, SessionPrefs.getVolume(this)));
-    }
-
-    private void renderExtraOptions() {
-        soundEffectsSwitch.setChecked(SessionPrefs.isSoundEffectsOn(this));
-        vibrationSwitch.setChecked(SessionPrefs.isVibrationOn(this));
-        if (SessionPrefs.isDiceFast(this)) {
-            diceSpeedFast.setChecked(true);
-        } else {
-            diceSpeedNormal.setChecked(true);
-        }
-        debugModeSwitch.setChecked(SessionPrefs.isDebugMode(this));
+    private void renderNickname() {
+        String nickname = SessionPrefs.getNickname(this);
+        nicknameValueText.setText(nickname == null || nickname.trim().isEmpty()
+                ? getString(R.string.options_nickname_not_set)
+                : nickname);
     }
 
     private void renderServerUrl() {

@@ -15,6 +15,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.util.Random;
 
 public class CaptchaActivity extends AppCompatActivity {
+    private static final int MAX_STAGE = 5;
+    private static final long TIME_LIMIT_MS = 60_000L;
 
     private GridLayout captchaGrid;
     private LinearLayout layoutExplanation;
@@ -23,11 +25,16 @@ public class CaptchaActivity extends AppCompatActivity {
     private TextView explanationTimer;
     private TextView countdownText;
     private TextView txtStatus;
+    private TextView timerText;
+    private TextView guideText;
     private int currentStage = 1;
-    private final int MAX_STAGE = 5;
-    private Random random = new Random();
+    private final Random random = new Random();
     private CountDownTimer explanationTimerObj;
     private CountDownTimer countdownTimerObj;
+    private CountDownTimer gameTimerObj;
+    private boolean cleared;
+    private boolean resultReturned;
+    private long remainingSeconds = TIME_LIMIT_MS / 1000L;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,6 +49,8 @@ public class CaptchaActivity extends AppCompatActivity {
         countdownText = findViewById(R.id.captchaCountdownText);
         captchaGrid = findViewById(R.id.captchaGrid);
         txtStatus = findViewById(R.id.txtStatus);
+        timerText = findViewById(R.id.captchaTimerText);
+        guideText = findViewById(R.id.captchaGuideText);
 
         startExplanationPhase();
     }
@@ -82,6 +91,26 @@ public class CaptchaActivity extends AppCompatActivity {
                 layoutCountdown.setVisibility(View.GONE);
                 layoutGame.setVisibility(View.VISIBLE);
                 startNewStage();
+                startGameTimer();
+            }
+        }.start();
+    }
+
+    private void startGameTimer() {
+        gameTimerObj = new CountDownTimer(TIME_LIMIT_MS, 1000) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                remainingSeconds = (long) Math.ceil(millisUntilFinished / 1000.0);
+                timerText.setText("남은 시간: " + remainingSeconds + "초");
+                if (cleared) {
+                    guideText.setText("클리어! 보드 복귀까지 " + remainingSeconds + "초");
+                }
+            }
+
+            @Override
+            public void onFinish() {
+                timerText.setText("남은 시간: 0초");
+                returnResult(cleared);
             }
         }.start();
     }
@@ -123,12 +152,7 @@ public class CaptchaActivity extends AppCompatActivity {
                         currentStage++;
                         startNewStage();
                     } else {
-                        Toast.makeText(this, "캡챠 미니게임 완료!", Toast.LENGTH_SHORT).show();
-                        Intent result = new Intent();
-                        result.putExtra(GameContract.EXTRA_SUCCESS, true);
-                        result.putExtra(GameContract.EXTRA_PROGRESS, 100);
-                        setResult(RESULT_OK, result);
-                        finish(); // 게임 종료 후 보드판으로 복귀
+                        markCleared();
                     }
                 });
             } else {
@@ -143,10 +167,38 @@ public class CaptchaActivity extends AppCompatActivity {
         }
     }
 
+    private void markCleared() {
+        if (cleared) {
+            return;
+        }
+        cleared = true;
+        captchaGrid.setEnabled(false);
+        captchaGrid.setAlpha(0.35f);
+        for (int i = 0; i < captchaGrid.getChildCount(); i++) {
+            captchaGrid.getChildAt(i).setEnabled(false);
+        }
+        txtStatus.setText("5단계 클리어!");
+        guideText.setText("클리어! 보드 복귀까지 " + remainingSeconds + "초");
+        Toast.makeText(this, "캡챠 미니게임 완료!", Toast.LENGTH_SHORT).show();
+    }
+
+    private void returnResult(boolean success) {
+        if (resultReturned) {
+            return;
+        }
+        resultReturned = true;
+        Intent result = new Intent();
+        result.putExtra(GameContract.EXTRA_SUCCESS, success);
+        result.putExtra(GameContract.EXTRA_PROGRESS, success ? 100 : 0);
+        setResult(RESULT_OK, result);
+        finish();
+    }
+
     @Override
     protected void onDestroy() {
         if (explanationTimerObj != null) explanationTimerObj.cancel();
         if (countdownTimerObj != null) countdownTimerObj.cancel();
+        if (gameTimerObj != null) gameTimerObj.cancel();
         super.onDestroy();
     }
 

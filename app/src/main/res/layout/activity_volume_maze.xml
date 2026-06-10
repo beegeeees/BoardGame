@@ -9,7 +9,7 @@
         android:id="@+id/layoutVolumeExplanation"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#1E1E1E"
+        android:background="@android:color/white"
         android:gravity="center"
         android:orientation="vertical"
         android:padding="24dp">
@@ -20,7 +20,7 @@
             android:layout_marginBottom="24dp"
             android:gravity="center"
             android:text="미니게임 3\n볼륨 미로"
-            android:textColor="#FFFFFF"
+            android:textColor="#111827"
             android:textSize="28sp"
             android:textStyle="bold" />
 
@@ -30,8 +30,8 @@
             android:layout_marginBottom="40dp"
             android:gravity="center"
             android:lineSpacingExtra="8dp"
-            android:text="휴대폰을 기울여 자석을 움직이고\n노란 공을 오른쪽 출구까지 끌고 가세요.\n\n볼륨 막대는 공의 진행도를 표시합니다.\n\n스마트폰을 세로로 잡아주세요."
-            android:textColor="#B0BEC5"
+            android:text="휴대폰을 기울여 자석을 움직이고\n노란 공을 오른쪽 출구까지 끌고 가세요.\n\n볼륨 막대는 공의 진행도를 표시합니다."
+            android:textColor="#4B5563"
             android:textSize="18sp" />
 
         <TextView
@@ -39,7 +39,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="10"
-            android:textColor="#FFCA28"
+            android:textColor="#1976D2"
             android:textSize="48sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -48,7 +48,7 @@
         android:id="@+id/layoutVolumeCountdown"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#CC000000"
+        android:background="@android:color/white"
         android:gravity="center"
         android:orientation="vertical"
         android:visibility="gone">
@@ -58,7 +58,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="3"
-            android:textColor="#FFFFFF"
+            android:textColor="#111827"
             android:textSize="120sp"
             android:textStyle="bold" />
     </LinearLayout>

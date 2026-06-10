@@ -2,13 +2,13 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#222222">
+    android:background="@android:color/white">
 
     <LinearLayout
         android:id="@+id/layoutCaptchaExplanation"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#1E1E1E"
+        android:background="@android:color/white"
         android:gravity="center"
         android:orientation="vertical"
         android:padding="24dp">
@@ -19,7 +19,7 @@
             android:layout_marginBottom="24dp"
             android:gravity="center"
             android:text="미니게임 1\n색상 캡챠"
-            android:textColor="#FFFFFF"
+            android:textColor="#111827"
             android:textSize="28sp"
             android:textStyle="bold" />
 
@@ -30,7 +30,7 @@
             android:gravity="center"
             android:lineSpacingExtra="8dp"
             android:text="비슷한 색깔들 사이에서\n다른 색깔의 칸을 하나 찾으세요!\n\n틀리면 1단계부터 다시 시작합니다."
-            android:textColor="#B0BEC5"
+            android:textColor="#4B5563"
             android:textSize="18sp" />
 
         <TextView
@@ -38,7 +38,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="10"
-            android:textColor="#FFCA28"
+            android:textColor="#1976D2"
             android:textSize="48sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -47,7 +47,7 @@
         android:id="@+id/layoutCaptchaCountdown"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#CC000000"
+        android:background="@android:color/white"
         android:gravity="center"
         android:orientation="vertical"
         android:visibility="gone">
@@ -57,7 +57,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="3"
-            android:textColor="#FFFFFF"
+            android:textColor="#111827"
             android:textSize="120sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -66,7 +66,7 @@
         android:id="@+id/layoutCaptchaGame"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#222222"
+        android:background="@android:color/white"
         android:gravity="center"
         android:orientation="vertical"
         android:padding="20dp"
@@ -78,15 +78,26 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"
             android:text="단계: 1 / 5"
-            android:textColor="#FFFFFF"
+            android:textColor="#111827"
             android:textSize="20sp" />
 
         <TextView
+            android:id="@+id/captchaTimerText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="남은 시간: 60초"
+            android:textColor="#D32F2F"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/captchaGuideText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="20dp"
             android:text="다른 색깔의 칸을 하나 찾으세요!"
-            android:textColor="#AAAAAA" />
+            android:textColor="#4B5563" />
 
         <GridLayout
             android:id="@+id/captchaGrid"

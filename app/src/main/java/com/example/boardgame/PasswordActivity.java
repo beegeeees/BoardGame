@@ -1,13 +1,14 @@
 package com.example.boardgame;
 
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -17,7 +18,8 @@ import androidx.appcompat.app.AppCompatActivity;
 
 public class PasswordActivity extends AppCompatActivity {
 
-    private LinearLayout layoutExplanation, layoutCountdown, layoutGame, layoutStageResult;
+    private LinearLayout layoutExplanation, layoutCountdown, layoutStageResult;
+    private View layoutGame;
     private TextView explanationTimer, countdownText, stageTitleText, timerText, clearText;
     private TextView stageResultStatus, stageRankText, stageScoreText, totalScoreText, nextStageNoticeText;
     private EditText passwordInput;
@@ -46,8 +48,8 @@ public class PasswordActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         setContentView(R.layout.activity_password);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         blockBackDuringGame();
 
         layoutExplanation = findViewById(R.id.layoutExplanation);
@@ -110,7 +112,6 @@ public class PasswordActivity extends AppCompatActivity {
     }
 
     private void startCountdownPhase() {
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         layoutStageResult.setVisibility(View.GONE);
         layoutCountdown.setVisibility(View.VISIBLE);
 
@@ -283,12 +284,12 @@ public class PasswordActivity extends AppCompatActivity {
 
     private void showStageResult() {
         isGameOver = true;
+        hideKeyboard();
         layoutGame.setVisibility(View.GONE);
         layoutStageResult.setVisibility(View.VISIBLE);
 
-        int stageScore = isCleared ? 100 : 0;
-        int stageRank = isCleared ? 1 : 4;
-        totalScore += stageScore;
+        int stageProgress = isCleared ? 100 : 0;
+        totalScore += stageProgress;
 
         if (isCleared) {
             stageResultStatus.setText(currentStage + "스테이지 통과!");
@@ -298,9 +299,9 @@ public class PasswordActivity extends AppCompatActivity {
             stageResultStatus.setTextColor(COLOR_RED);
         }
 
-        stageRankText.setText("해당 스테이지 등수: " + stageRank + "등");
-        stageScoreText.setText("획득 점수: +" + stageScore + "점");
-        totalScoreText.setText("누적 점수: " + totalScore + "점");
+        stageRankText.setText("통과 스테이지: " + (totalScore / 100) + " / 3");
+        stageScoreText.setText("최종 순위 보상: 1위 +10 · 2위 +7 · 3위 +5 · 4위 +3 · 미완료 0");
+        totalScoreText.setText("현재 진행도: " + Math.min(100, totalScore / 3) + "%");
 
         if (currentStage < 3) {
             nextStageNoticeText.setText("잠시 후 다음 스테이지가 시작됩니다...");
@@ -323,6 +324,14 @@ public class PasswordActivity extends AppCompatActivity {
                 }
             }
         }.start();
+    }
+
+    private void hideKeyboard() {
+        passwordInput.clearFocus();
+        InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (inputMethodManager != null) {
+            inputMethodManager.hideSoftInputFromWindow(passwordInput.getWindowToken(), 0);
+        }
     }
 
     private void goToFinalResult() {

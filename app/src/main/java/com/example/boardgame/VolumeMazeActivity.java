@@ -29,14 +29,17 @@ public class VolumeMazeActivity extends AppCompatActivity implements SensorEvent
     private SeekBar volumeBar;
     private TextView statusText;
     private TextView volumeIndicatorText;
+    private Button resetButton;
     private SensorManager sensorManager;
     private Sensor accelerometer;
     private CountDownTimer timer;
     private CountDownTimer explanationTimer;
     private CountDownTimer countdownTimer;
-    private boolean finished;
+    private boolean cleared;
+    private boolean resultReturned;
     private boolean gameStarted;
     private int bestProgress;
+    private long remainingSeconds = TIME_LIMIT_MS / 1000L;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,7 +56,7 @@ public class VolumeMazeActivity extends AppCompatActivity implements SensorEvent
         volumeBar = findViewById(R.id.volumeBar);
         statusText = findViewById(R.id.miniGameStatusText);
         volumeIndicatorText = findViewById(R.id.volumeIndicatorText);
-        Button resetButton = findViewById(R.id.resetButton);
+        resetButton = findViewById(R.id.resetButton);
 
         volumeBar.setMax(100);
         volumeBar.setEnabled(false);
@@ -69,7 +72,7 @@ public class VolumeMazeActivity extends AppCompatActivity implements SensorEvent
 
             @Override
             public void onGoalReached() {
-                finishMiniGame(true);
+                markCleared();
             }
         });
 
@@ -138,12 +141,15 @@ public class VolumeMazeActivity extends AppCompatActivity implements SensorEvent
         timer = new CountDownTimer(TIME_LIMIT_MS, 1000) {
             @Override
             public void onTick(long millisUntilFinished) {
-                statusText.setText("볼륨 미로 진행 중 | " + (millisUntilFinished / 1000) + "초");
+                remainingSeconds = (long) Math.ceil(millisUntilFinished / 1000.0);
+                statusText.setText(cleared
+                        ? "클리어! 보드 복귀까지 " + remainingSeconds + "초"
+                        : "볼륨 미로 진행 중 | " + remainingSeconds + "초");
             }
 
             @Override
             public void onFinish() {
-                finishMiniGame(false);
+                completeMiniGame(cleared);
             }
         }.start();
     }
@@ -151,7 +157,7 @@ public class VolumeMazeActivity extends AppCompatActivity implements SensorEvent
     @Override
     protected void onResume() {
         super.onResume();
-        if (gameStarted && !finished) {
+        if (gameStarted && !cleared && !resultReturned) {
             mazeView.start();
             registerSensor();
         }
@@ -183,16 +189,30 @@ public class VolumeMazeActivity extends AppCompatActivity implements SensorEvent
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
     }
 
-    private void finishMiniGame(boolean success) {
-        if (finished) {
+    private void markCleared() {
+        if (cleared || resultReturned) {
             return;
         }
-        finished = true;
-        if (timer != null) {
-            timer.cancel();
+        cleared = true;
+        bestProgress = 100;
+        mazeView.stop();
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(this);
         }
-        Toast.makeText(this, success ? "볼륨 미로 클리어!" : "볼륨 미로 시간 초과!", Toast.LENGTH_SHORT).show();
+        resetButton.setEnabled(false);
+        resetButton.setAlpha(0.4f);
+        statusText.setText("클리어! 보드 복귀까지 " + remainingSeconds + "초");
+        Toast.makeText(this, "볼륨 미로 클리어!", Toast.LENGTH_SHORT).show();
+    }
 
+    private void completeMiniGame(boolean success) {
+        if (resultReturned) {
+            return;
+        }
+        resultReturned = true;
+        if (!success) {
+            Toast.makeText(this, "볼륨 미로 시간 초과!", Toast.LENGTH_SHORT).show();
+        }
         Intent result = new Intent();
         result.putExtra(GameContract.EXTRA_SUCCESS, success);
         result.putExtra(GameContract.EXTRA_PROGRESS, success ? 100 : bestProgress);

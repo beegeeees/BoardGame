@@ -82,7 +82,8 @@ Current server behavior:
 - duration is 240 seconds
 - submission grace is 5 seconds
 - scores are ranked by `ScoreService`
-- rewards by rank are `30, 20, 10, 5`
+- rewards by rank are `10, 7, 5, 3`
+- players who do not complete the mini-game receive `0`
 - after mini-game finish, the next round starts
 - after final round, the game finishes
 

@@ -40,7 +40,8 @@
             android:exported="false" />
         <activity
             android:name=".PasswordActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
             android:exported="false" />
         <activity
             android:name=".VolumeMazeActivity"
