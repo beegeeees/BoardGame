@@ -300,7 +300,7 @@ public class PasswordActivity extends AppCompatActivity {
         }
 
         stageRankText.setText("통과 스테이지: " + (totalScore / 100) + " / 3");
-        stageScoreText.setText("최종 순위 보상: 1위 +10 · 2위 +7 · 3위 +5 · 4위 +3 · 미완료 0");
+        stageScoreText.setText("최종 순위 보상: 1위 +10 · 2위 +7 · 3위 +5 · 4위 +3 · 미완료 시 진행도 0");
         totalScoreText.setText("현재 진행도: " + Math.min(100, totalScore / 3) + "%");
 
         if (currentStage < 3) {

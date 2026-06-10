@@ -22,11 +22,25 @@ public class TitleActivity extends AppCompatActivity {
         Button joinGameButton = findViewById(R.id.joinGameButton);
         Button optionsButton = findViewById(R.id.optionsButton);
         Button rulesButton = findViewById(R.id.rulesButton);
+        Button openCaptchaButton = findViewById(R.id.openCaptchaButton);
+        Button openPasswordButton = findViewById(R.id.openPasswordButton);
+        Button openVolumeMazeButton = findViewById(R.id.openVolumeMazeButton);
 
         joinGameButton.setOnClickListener(view -> onJoinGameClicked());
         optionsButton.setOnClickListener(view -> startActivity(new Intent(this, OptionsActivity.class)));
         rulesButton.setOnClickListener(view -> showRulesPagerDialog());
         nicknameBadge.setOnClickListener(view -> startActivity(new Intent(this, NicknameActivity.class)));
+
+        // Temporary shortcuts for capturing mini-game screenshots.
+        openCaptchaButton.setOnClickListener(
+                view -> startActivity(new Intent(this, CaptchaActivity.class))
+        );
+        openPasswordButton.setOnClickListener(
+                view -> startActivity(new Intent(this, PasswordActivity.class))
+        );
+        openVolumeMazeButton.setOnClickListener(
+                view -> startActivity(new Intent(this, VolumeMazeActivity.class))
+        );
     }
 
     @Override

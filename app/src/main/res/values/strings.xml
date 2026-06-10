@@ -5,6 +5,10 @@
     <string name="title_join_button">게임 참여\n(Room List)</string>
     <string name="title_options_button">옵션</string>
     <string name="title_rules_button">Rules / How to play</string>
+    <string name="title_capture_shortcuts">임시 촬영용 미니게임 바로가기</string>
+    <string name="title_open_captcha">캡챠</string>
+    <string name="title_open_password">비밀번호</string>
+    <string name="title_open_volume_maze">볼륨 미로</string>
     <string name="rules_prev">이전</string>
     <string name="rules_next">다음</string>
     <string name="title_nickname_format">닉네임: %1$s</string>
