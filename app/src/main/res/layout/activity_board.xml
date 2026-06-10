@@ -259,10 +259,27 @@
             android:textColor="@color/white"
             android:textSize="@dimen/board_roll_button_text_size"
             android:textStyle="bold"
-            app:layout_constraintBottom_toTopOf="@id/txtTurnInfo"
+            app:layout_constraintBottom_toTopOf="@id/txtDiceCountdown"
             app:layout_constraintEnd_toEndOf="@id/g_v4"
             app:layout_constraintStart_toEndOf="@id/g_v1"
             app:layout_constraintTop_toBottomOf="@id/txtDiceVisual" />
+
+        <TextView
+            android:id="@+id/txtDiceCountdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="주사위 선택 30초"
+            android:textColor="#FFCA28"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintBottom_toTopOf="@id/txtTurnInfo"
+            app:layout_constraintEnd_toEndOf="@id/g_v4"
+            app:layout_constraintStart_toEndOf="@id/g_v1"
+            app:layout_constraintTop_toBottomOf="@id/btnDice" />
 
         <TextView
             android:id="@+id/txtTurnInfo"
@@ -280,7 +297,7 @@
             app:layout_constraintBottom_toTopOf="@id/g_h4"
             app:layout_constraintEnd_toEndOf="@id/g_v4"
             app:layout_constraintStart_toEndOf="@id/g_v1"
-            app:layout_constraintTop_toBottomOf="@id/btnDice" />
+            app:layout_constraintTop_toBottomOf="@id/txtDiceCountdown" />
 
         <ImageView
             android:id="@+id/player1"
@@ -335,5 +352,221 @@
             app:layout_constraintTop_toTopOf="@id/tile0" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <FrameLayout
+        android:id="@+id/diceOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#99000000"
+        android:clickable="true"
+        android:elevation="30dp"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="520dp"
+            android:layout_height="330dp"
+            android:layout_gravity="center"
+            app:cardBackgroundColor="@android:color/white"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="12dp">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <Button
+                    android:id="@+id/diceOverlayBoardButton"
+                    android:layout_width="94dp"
+                    android:layout_height="38dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginEnd="12dp"
+                    android:backgroundTint="#607D8B"
+                    android:elevation="8dp"
+                    android:includeFontPadding="false"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="보드 보기"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/diceSelectionContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipChildren="false"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:id="@+id/diceOverlayTimer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="30"
+                        android:textColor="#FFCA28"
+                        android:textSize="38sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/diceOverlayInstruction"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:maxLines="2"
+                        android:text="주사위 버튼을 선택하고 굴리기를 누르세요."
+                        android:textColor="#333333"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/diceOverlayVisual"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="⚀"
+                        android:textColor="#333333"
+                        android:textSize="54sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="58dp"
+                        android:clipChildren="false"
+                        android:orientation="horizontal"
+                        android:weightSum="4">
+
+                        <Button
+                            android:id="@+id/diceOverlay12"
+                            style="@style/Widget.AppCompat.Button"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginEnd="4dp"
+                            android:layout_weight="1"
+                            android:autoSizeMaxTextSize="13sp"
+                            android:autoSizeMinTextSize="10sp"
+                            android:autoSizeTextType="uniform"
+                            android:backgroundTint="#42A5F5"
+                            android:gravity="center"
+                            android:minHeight="0dp"
+                            android:minWidth="0dp"
+                            android:padding="2dp"
+                            android:text="1~2\n(30%)"
+                            android:textColor="@android:color/white"
+                            android:textStyle="bold" />
+
+                        <Button
+                            android:id="@+id/diceOverlay34"
+                            style="@style/Widget.AppCompat.Button"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginHorizontal="4dp"
+                            android:layout_weight="1"
+                            android:autoSizeMaxTextSize="13sp"
+                            android:autoSizeMinTextSize="10sp"
+                            android:autoSizeTextType="uniform"
+                            android:backgroundTint="#66BB6A"
+                            android:gravity="center"
+                            android:minHeight="0dp"
+                            android:minWidth="0dp"
+                            android:padding="2dp"
+                            android:text="3~4\n(20%)"
+                            android:textColor="@android:color/white"
+                            android:textStyle="bold" />
+
+                        <Button
+                            android:id="@+id/diceOverlay56"
+                            style="@style/Widget.AppCompat.Button"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginHorizontal="4dp"
+                            android:layout_weight="1"
+                            android:autoSizeMaxTextSize="13sp"
+                            android:autoSizeMinTextSize="10sp"
+                            android:autoSizeTextType="uniform"
+                            android:backgroundTint="#FFA726"
+                            android:gravity="center"
+                            android:minHeight="0dp"
+                            android:minWidth="0dp"
+                            android:padding="2dp"
+                            android:text="5~6\n(20%)"
+                            android:textColor="@android:color/white"
+                            android:textStyle="bold" />
+
+                        <Button
+                            android:id="@+id/diceOverlayRandom"
+                            style="@style/Widget.AppCompat.Button"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:autoSizeMaxTextSize="13sp"
+                            android:autoSizeMinTextSize="10sp"
+                            android:autoSizeTextType="uniform"
+                            android:backgroundTint="#AB47BC"
+                            android:gravity="center"
+                            android:minHeight="0dp"
+                            android:minWidth="0dp"
+                            android:padding="2dp"
+                            android:text="랜덤\n(1/6)"
+                            android:textColor="@android:color/white"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/diceOverlayRollButton"
+                        android:layout_width="168dp"
+                        android:layout_height="46dp"
+                        android:layout_marginTop="10dp"
+                        android:backgroundTint="#1976D2"
+                        android:includeFontPadding="false"
+                        android:minHeight="0dp"
+                        android:minWidth="0dp"
+                        android:text="굴리기"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/diceResultContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="주사위 결과"
+                        android:textColor="#5C6A7D"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/diceOverlayResult"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="5"
+                        android:textColor="#1976D2"
+                        android:textSize="76sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </FrameLayout>
+        </androidx.cardview.widget.CardView>
+    </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

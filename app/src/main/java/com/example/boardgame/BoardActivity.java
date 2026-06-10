@@ -1,13 +1,19 @@
 package com.example.boardgame;
 
 import android.content.Intent;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ReplacementSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -62,7 +68,7 @@ public class BoardActivity extends AppCompatActivity {
     private TextView txtDiceVisual;
     private TextView txtTurnInfo;
     private Button btnDice;
-    private ActivityResultLauncher<Intent> diceLauncher;
+    private BoardDiceController diceController;
     private ActivityResultLauncher<Intent> microGameLauncher;
     private ActivityResultLauncher<Intent> miniGameLauncher;
 
@@ -73,6 +79,9 @@ public class BoardActivity extends AppCompatActivity {
     private int launchedMiniGameRound = 0;
     private int submittedMiniGameRound = 0;
     private boolean finalDialogShown = false;
+    private boolean diceSubmissionPending = false;
+    private boolean tileEventDialogVisible = false;
+    private String pendingTileEventType = "";
     private Runnable pendingTileEffectRunnable;
     private Runnable pendingMiniGameStartRunnable;
     private AlertDialog phaseNoticeDialog;
@@ -86,6 +95,7 @@ public class BoardActivity extends AppCompatActivity {
 
         @Override
         public void onGameUpdated(GameSnapshot game) {
+            showPendingTileEventResult(game);
             renderBoard();
             driveGamePhase();
         }
@@ -101,6 +111,14 @@ public class BoardActivity extends AppCompatActivity {
                 scheduleFinishMiniGame();
                 return;
             }
+            if (diceSubmissionPending
+                    && game != null
+                    && isMyTurn(game)
+                    && "WAITING_FOR_ROLL".equals(game.getTurnPhase())) {
+                diceSubmissionPending = false;
+                renderBoard();
+            }
+            pendingTileEventType = "";
             Toast.makeText(BoardActivity.this, details, Toast.LENGTH_SHORT).show();
         }
     };
@@ -115,6 +133,7 @@ public class BoardActivity extends AppCompatActivity {
         txtDiceVisual = findViewById(R.id.txtDiceVisual);
         txtTurnInfo = findViewById(R.id.txtTurnInfo);
         btnDice = findViewById(R.id.btnDice);
+        diceController = new BoardDiceController(this, this::submitDiceResult);
         playerViews[0] = findViewById(R.id.player1);
         playerViews[1] = findViewById(R.id.player2);
         playerViews[2] = findViewById(R.id.player3);
@@ -124,9 +143,7 @@ public class BoardActivity extends AppCompatActivity {
 
         createScorePanels();
         btnDice.setOnClickListener(view -> {
-            btnDice.setEnabled(false);
-            btnDice.setAlpha(0.40f);
-            diceLauncher.launch(new Intent(this, DiceActivity.class));
+            diceController.show();
         });
 
         renderBoard();
@@ -145,6 +162,9 @@ public class BoardActivity extends AppCompatActivity {
     protected void onStop() {
         ServerSession.removeListener(serverListener);
         cancelPendingPhaseActions();
+        if (diceController != null) {
+            diceController.cancel();
+        }
         super.onStop();
     }
 
@@ -164,19 +184,6 @@ public class BoardActivity extends AppCompatActivity {
     }
 
     private void registerGameLaunchers() {
-        diceLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-            GameSnapshot game = ServerSession.getLatestGameSnapshot();
-            if (game != null && isMyTurn(game) && "WAITING_FOR_ROLL".equals(game.getTurnPhase())) {
-                int diceRoll = 0;
-                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                    diceRoll = result.getData().getIntExtra(GameContract.EXTRA_DICE_RESULT, 0);
-                }
-                ServerSession.rollDice(diceRoll);
-            } else {
-                renderBoard();
-            }
-        });
-
         microGameLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             boolean success = result.getResultCode() == RESULT_OK
                     && result.getData() != null
@@ -208,6 +215,7 @@ public class BoardActivity extends AppCompatActivity {
         RoomSnapshot room = ServerSession.getLatestRoomSnapshot();
         GameSnapshot game = ServerSession.getLatestGameSnapshot();
         if (room == null) {
+            diceSubmissionPending = false;
             txtTurnInfo.setText("게임 정보를 기다리는 중");
             btnDice.setEnabled(false);
             btnDice.setAlpha(0.40f);
@@ -232,6 +240,10 @@ public class BoardActivity extends AppCompatActivity {
         }
 
         if (game == null) {
+            diceSubmissionPending = false;
+            if (diceController != null && diceController.isActive()) {
+                diceController.cancel();
+            }
             txtDiceVisual.setText("?");
             txtTurnInfo.setText("게임 시작 대기 중");
             btnDice.setEnabled(false);
@@ -241,7 +253,22 @@ public class BoardActivity extends AppCompatActivity {
 
         txtDiceVisual.setText(game.getLastDiceRoll() > 0 ? String.valueOf(game.getLastDiceRoll()) : "?");
         txtTurnInfo.setText(turnText(room, game));
-        boolean isDiceEnabled = isMyTurn(game) && "WAITING_FOR_ROLL".equals(game.getTurnPhase());
+        boolean canRollDice = isMyTurn(game)
+                && "WAITING_FOR_ROLL".equals(game.getTurnPhase());
+        if (!canRollDice) {
+            diceSubmissionPending = false;
+            if (diceController != null && diceController.isActive()) {
+                diceController.cancel();
+            }
+        } else if (!diceSubmissionPending
+                && !tileEventDialogVisible
+                && diceController != null
+                && !diceController.isActive()) {
+            diceController.beginTurn();
+        }
+        boolean isDiceEnabled = canRollDice
+                && !diceSubmissionPending
+                && !tileEventDialogVisible;
         btnDice.setEnabled(isDiceEnabled);
         btnDice.setAlpha(isDiceEnabled ? 1.0f : 0.40f);
 
@@ -250,6 +277,23 @@ public class BoardActivity extends AppCompatActivity {
             btnDice.setAlpha(0.40f);
             showFinalRanking(room);
         }
+    }
+
+    private void submitDiceResult(int diceRoll) {
+        GameSnapshot game = ServerSession.getLatestGameSnapshot();
+        if (game != null
+                && isMyTurn(game)
+                && "WAITING_FOR_ROLL".equals(game.getTurnPhase())
+                && diceRoll >= 1
+                && diceRoll <= 6) {
+            diceSubmissionPending = true;
+            btnDice.setEnabled(false);
+            btnDice.setAlpha(0.40f);
+            txtDiceVisual.setText(String.valueOf(diceRoll));
+            ServerSession.rollDice(diceRoll);
+            return;
+        }
+        renderBoard();
     }
 
     private void driveGamePhase() {
@@ -272,9 +316,13 @@ public class BoardActivity extends AppCompatActivity {
                     showPhaseNotice(getString(R.string.board_ad_notice));
                     delayMillis = AD_NOTICE_DELAY_MILLIS;
                 }
+                String tileEventType = currentPlayer == null
+                        ? ""
+                        : tileEventType(currentPlayer.getPosition());
                 pendingTileEffectRunnable = () -> {
                     pendingTileEffectRunnable = null;
                     dismissPhaseNotice();
+                    pendingTileEventType = tileEventType;
                     ServerSession.applyTileEffect();
                 };
                 handler.postDelayed(pendingTileEffectRunnable, delayMillis);
@@ -361,7 +409,7 @@ public class BoardActivity extends AppCompatActivity {
 
     private void renderScorePanel(TextView panel, PlayerSnapshot player, int index, boolean active) {
         String turnLabel = active ? "  ▶ 턴" : "";
-        String meBadge = player.getId().equals(ServerSession.getCurrentPlayerId()) ? " [나]" : "";
+        boolean isMe = player.getId().equals(ServerSession.getCurrentPlayerId());
         panel.bringToFront();
         panel.setBackground(createScorePanelBackground(index, active));
         panel.setElevation(active ? dp(22) : dp(14));
@@ -372,7 +420,91 @@ public class BoardActivity extends AppCompatActivity {
                 .scaleY(active ? 1.04f : 1.0f)
                 .setDuration(160L)
                 .start();
-        panel.setText(player.getNickname() + meBadge + turnLabel + "\n" + player.getScore() + "점");
+        SpannableStringBuilder label = new SpannableStringBuilder(player.getNickname());
+        if (isMe) {
+            label.append(" ");
+            int badgeStart = label.length();
+            label.append("나");
+            label.setSpan(
+                    new MeBadgeSpan(dp(4), dp(3), dp(5)),
+                    badgeStart,
+                    label.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            );
+        }
+        label.append(turnLabel)
+                .append("\n")
+                .append(String.valueOf(player.getScore()))
+                .append("점");
+        panel.setText(label);
+    }
+
+    private static final class MeBadgeSpan extends ReplacementSpan {
+        private final int horizontalPadding;
+        private final int verticalPadding;
+        private final float cornerRadius;
+
+        MeBadgeSpan(int horizontalPadding, int verticalPadding, float cornerRadius) {
+            this.horizontalPadding = horizontalPadding;
+            this.verticalPadding = verticalPadding;
+            this.cornerRadius = cornerRadius;
+        }
+
+        @Override
+        public int getSize(
+                Paint paint,
+                CharSequence text,
+                int start,
+                int end,
+                Paint.FontMetricsInt fontMetrics
+        ) {
+            if (fontMetrics != null) {
+                fontMetrics.ascent -= verticalPadding;
+                fontMetrics.top = fontMetrics.ascent;
+                fontMetrics.descent += verticalPadding;
+                fontMetrics.bottom = fontMetrics.descent;
+            }
+            return Math.round(paint.measureText(text, start, end)) + (horizontalPadding * 2);
+        }
+
+        @Override
+        public void draw(
+                Canvas canvas,
+                CharSequence text,
+                int start,
+                int end,
+                float x,
+                int top,
+                int y,
+                int bottom,
+                Paint paint
+        ) {
+            float textWidth = paint.measureText(text, start, end);
+            Paint.FontMetrics metrics = paint.getFontMetrics();
+            float badgeTop = y + metrics.ascent - verticalPadding;
+            float badgeBottom = y + metrics.descent + verticalPadding;
+
+            int originalColor = paint.getColor();
+            Paint.Style originalStyle = paint.getStyle();
+            paint.setColor(Color.WHITE);
+            paint.setStyle(Paint.Style.FILL);
+            canvas.drawRoundRect(
+                    new RectF(
+                            x,
+                            badgeTop,
+                            x + textWidth + (horizontalPadding * 2),
+                            badgeBottom
+                    ),
+                    cornerRadius,
+                    cornerRadius,
+                    paint
+            );
+
+            paint.setColor(Color.rgb(31, 106, 68));
+            canvas.drawText(text, start, end, x + horizontalPadding, y, paint);
+            paint.setColor(originalColor);
+            paint.setStyle(originalStyle);
+        }
     }
 
     private GradientDrawable createScorePanelBackground(int playerIndex, boolean active) {
@@ -573,6 +705,66 @@ public class BoardActivity extends AppCompatActivity {
     private boolean isAdTile(int position) {
         int tileIndex = Math.floorMod(position, BOARD_SIZE);
         return tileIndex == 6 || tileIndex == 14;
+    }
+
+    private String tileEventType(int position) {
+        int tileIndex = Math.floorMod(position, BOARD_SIZE);
+        if (tileIndex == 2 || tileIndex == 10) {
+            return "CARD";
+        }
+        if (tileIndex == 4 || tileIndex == 8 || tileIndex == 12) {
+            return "QUESTION";
+        }
+        return "";
+    }
+
+    private void showPendingTileEventResult(GameSnapshot game) {
+        if (game == null
+                || pendingTileEventType.isEmpty()
+                || "WAITING_FOR_TILE_EFFECT".equals(game.getTurnPhase())) {
+            return;
+        }
+
+        String eventType = pendingTileEventType;
+        pendingTileEventType = "";
+        String systemMessage = game.getLastSystemMessage();
+
+        if ("CARD".equals(eventType)) {
+            boolean alreadyHasCard = systemMessage != null
+                    && systemMessage.contains("already has a card");
+            showTileEventDialog(
+                    alreadyHasCard ? "카드 보유 중" : "방어 카드 획득!",
+                    alreadyHasCard
+                            ? "이미 방어 카드를 보유하고 있어 추가로 획득하지 않았습니다."
+                            : "방어 카드를 획득했습니다.\n점수 감소 칸에 도착하면 자동으로 사용됩니다."
+            );
+            return;
+        }
+
+        if ("QUESTION".equals(eventType)) {
+            boolean gainedScore = systemMessage != null
+                    && systemMessage.contains("question result: 5 points");
+            showTileEventDialog(
+                    "물음표 이벤트",
+                    gainedScore
+                            ? "행운의 결과!\n점수 5점을 획득했습니다."
+                            : "아쉬운 결과!\n점수 5점을 잃었습니다."
+            );
+        }
+    }
+
+    private void showTileEventDialog(String title, String message) {
+        tileEventDialogVisible = true;
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("확인", null)
+                .create();
+        dialog.setOnDismissListener(ignored -> {
+            tileEventDialogVisible = false;
+            renderBoard();
+        });
+        dialog.show();
     }
 
     private String turnText(RoomSnapshot room, GameSnapshot game) {

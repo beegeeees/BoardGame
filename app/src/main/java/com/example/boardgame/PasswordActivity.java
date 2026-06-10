@@ -133,10 +133,6 @@ public class PasswordActivity extends AppCompatActivity {
 
     private void setupStage(int stage) {
         layoutGame.setVisibility(View.VISIBLE);
-        passwordInput.setText("");
-        passwordInput.setEnabled(true);
-        passwordInput.setAlpha(1.0f);
-        clearText.setText("");
         isCleared = false;
         isGameOver = false;
 
@@ -166,6 +162,11 @@ public class PasswordActivity extends AppCompatActivity {
             currentRuleColors = new int[]{COLOR_GREEN, COLOR_ORANGE, COLOR_ORANGE, COLOR_RED, COLOR_RED};
         }
 
+        passwordInput.setText("");
+        passwordInput.setEnabled(true);
+        passwordInput.setAlpha(1.0f);
+        clearText.setText("");
+
         for (int i = 0; i < activeRuleCount; i++) {
             rulesView[i].setVisibility(View.VISIBLE);
             rulesView[i].setText("조건 " + (i + 1) + ": ???");
@@ -193,6 +194,10 @@ public class PasswordActivity extends AppCompatActivity {
     }
 
     private void checkCurrentStageRules(String input) {
+        if (activeRuleCount <= 0 || currentRuleTexts == null || currentRuleColors == null) {
+            return;
+        }
+
         boolean[] pass = new boolean[5];
 
         if (currentStage == 1) {
@@ -237,6 +242,11 @@ public class PasswordActivity extends AppCompatActivity {
             passwordInput.setAlpha(1.0f);
             clearText.setText(currentStage + "스테이지 통과!\n남은 시간을 대기합니다...");
             clearText.setTextColor(Color.parseColor("#1976D2"));
+            MiniGameClearFeedback.show(
+                    this,
+                    currentStage + "스테이지 클리어!",
+                    "조건을 모두 충족했습니다."
+            );
         }
     }
 

@@ -5,10 +5,6 @@
     <string name="title_join_button">게임 참여\n(Room List)</string>
     <string name="title_options_button">옵션</string>
     <string name="title_rules_button">Rules / How to play</string>
-    <string name="title_capture_shortcuts">임시 촬영용 미니게임 바로가기</string>
-    <string name="title_open_captcha">캡챠</string>
-    <string name="title_open_password">비밀번호</string>
-    <string name="title_open_volume_maze">볼륨 미로</string>
     <string name="rules_prev">이전</string>
     <string name="rules_next">다음</string>
     <string name="title_nickname_format">닉네임: %1$s</string>
@@ -75,7 +71,6 @@
     <string name="board_screen_title">불편마불 보드판</string>
     <string name="board_ad_notice">잠시 후 광고 미니게임이 시작됩니다...</string>
     <string name="board_minigame_notice">잠시 후 라운드 미니게임이 시작됩니다...</string>
-    <string name="board_demo_title">보드 화면</string>
     <string name="board_participants_title">참여 플레이어</string>
     <string name="board_start_countdown">%1$d초 뒤 게임이 시작됩니다...</string>
     <string name="board_start_now">게임 시작</string>

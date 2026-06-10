@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 import java.util.Set;
 
 public class VolumeMazeView extends View {
@@ -30,8 +31,10 @@ public class VolumeMazeView extends View {
     private static final float OUTER_MARGIN_RATIO = 0.035f;
     private static final float WALL_THICKNESS_N = 0.0044f;
     private static final float BALL_RADIUS_N = 0.0150f;
-    private static final float START_MARGIN_N = 0.006f;
     private static final float INITIAL_MAGNET_TRACK_T = 0.66f;
+    private static final int LEGACY_MAZE_SEED = 20260427;
+    private static final int MAZE_GENERATION_ATTEMPTS = 160;
+    private static final int RANDOM_MAZE_RETRIES = 8;
 
     private static final class WallSegment {
         final float x1;
@@ -118,8 +121,8 @@ public class VolumeMazeView extends View {
     private float filteredTiltX = 0f;
     private float filteredTiltY = 0f;
 
-    private float ballX = BALL_RADIUS_N + START_MARGIN_N;
-    private float ballY = 1f - BALL_RADIUS_N - START_MARGIN_N;
+    private float ballX = BALL_RADIUS_N;
+    private float ballY = 1f - BALL_RADIUS_N;
     private float velocityX = 0f;
     private float velocityY = 0f;
     private float stuckTime = 0f;
@@ -181,14 +184,11 @@ public class VolumeMazeView extends View {
         filteredTiltX = 0f;
         filteredTiltY = 0f;
 
-        ballX = BALL_RADIUS_N + START_MARGIN_N;
-        ballY = 1f - BALL_RADIUS_N - START_MARGIN_N;
+        ballX = BALL_RADIUS_N;
+        ballY = 1f - BALL_RADIUS_N;
         velocityX = 0f;
         velocityY = 0f;
         stuckTime = 0f;
-
-        magnetTrackT = INITIAL_MAGNET_TRACK_T;
-        syncMagnetToTrack();
 
         goalReached = false;
         goalPulse = 0f;
@@ -255,6 +255,18 @@ public class VolumeMazeView extends View {
     }
 
     private void buildMaze() {
+        Random seedRandom = new Random(System.nanoTime());
+        for (int retry = 0; retry < RANDOM_MAZE_RETRIES; retry++) {
+            if (buildMazeFromSeed(seedRandom.nextInt(), false)) {
+                return;
+            }
+        }
+        if (!buildMazeFromSeed(LEGACY_MAZE_SEED, false)) {
+            buildMazeFromSeed(LEGACY_MAZE_SEED, true);
+        }
+    }
+
+    private boolean buildMazeFromSeed(int baseSeed, boolean allowSingleRouteFallback) {
         wallSegments.clear();
         wallRects.clear();
 
@@ -271,16 +283,16 @@ public class VolumeMazeView extends View {
 
         boolean[][] selectedVertical = filledBooleanGrid(rows, cols + 1, true);
         boolean[][] selectedHorizontal = filledBooleanGrid(rows + 1, cols, true);
-        List<Cell> selectedBridgePath = null;
-        boolean foundTwoRouteCandidate = false;
+        List<List<Cell>> selectedBridgePaths = null;
+        boolean foundMultiRouteCandidate = false;
 
-        for (int attempt = 0; attempt < 160; attempt++) {
+        for (int attempt = 0; attempt < MAZE_GENERATION_ATTEMPTS; attempt++) {
             boolean[][] vertical = filledBooleanGrid(rows, cols + 1, true);
             boolean[][] horizontal = filledBooleanGrid(rows + 1, cols, true);
             boolean[][] visited = new boolean[rows][cols];
             int[][] parentX = filledIntGrid(rows, cols, -1);
             int[][] parentY = filledIntGrid(rows, cols, -1);
-            KotlinRandom rng = new KotlinRandom(20260427 + attempt);
+            KotlinRandom rng = new KotlinRandom(baseSeed + attempt);
 
             ArrayDeque<Cell> stack = new ArrayDeque<>();
             stack.addLast(new Cell(startX, startY));
@@ -339,12 +351,13 @@ public class VolumeMazeView extends View {
                 continue;
             }
 
-            List<Cell> bridge = findBridgePath(path, rng);
-            if (bridge != null) {
+            int targetBridgeCount = 1 + rng.nextInt(2);
+            List<List<Cell>> bridges = findBridgePaths(path, rng, targetBridgeCount);
+            if (!bridges.isEmpty()) {
                 selectedVertical = vertical;
                 selectedHorizontal = horizontal;
-                selectedBridgePath = bridge;
-                foundTwoRouteCandidate = true;
+                selectedBridgePaths = bridges;
+                foundMultiRouteCandidate = true;
                 break;
             }
 
@@ -352,8 +365,12 @@ public class VolumeMazeView extends View {
             selectedHorizontal = horizontal;
         }
 
-        if (foundTwoRouteCandidate && selectedBridgePath != null) {
-            carveEdgePath(selectedBridgePath, selectedVertical, selectedHorizontal);
+        if (foundMultiRouteCandidate && selectedBridgePaths != null) {
+            for (List<Cell> bridgePath : selectedBridgePaths) {
+                carveEdgePath(bridgePath, selectedVertical, selectedHorizontal);
+            }
+        } else if (!allowSingleRouteFallback) {
+            return false;
         } else {
             int midX = cols / 2;
             int midY = rows / 2;
@@ -365,8 +382,14 @@ public class VolumeMazeView extends View {
         selectedVertical[exitY][cols] = false;
         selectedVertical[exitY][cols - 1] = false;
 
-        applyLowerLeftLocalTweak(selectedVertical, selectedHorizontal);
-        applyUpperRightLocalTweak(selectedVertical);
+        if (allowSingleRouteFallback) {
+            applyLowerLeftLocalTweak(selectedVertical, selectedHorizontal);
+            applyUpperRightLocalTweak(selectedVertical);
+        }
+
+        if (!hasPathToGoal(selectedVertical, selectedHorizontal)) {
+            return false;
+        }
 
         for (int x = 0; x <= cols; x++) {
             int y = 0;
@@ -397,6 +420,52 @@ public class VolumeMazeView extends View {
                 addWallSegment(runStart / (float) cols, y / (float) rows, x / (float) cols, y / (float) rows);
             }
         }
+        return true;
+    }
+
+    private boolean hasPathToGoal(boolean[][] vertical, boolean[][] horizontal) {
+        int startX = 0;
+        int startY = rows - 1;
+        int exitX = cols - 1;
+        int exitY = goalRow;
+
+        boolean[][] visited = new boolean[rows][cols];
+        ArrayDeque<Cell> queue = new ArrayDeque<>();
+        queue.addLast(new Cell(startX, startY));
+        visited[startY][startX] = true;
+
+        while (!queue.isEmpty()) {
+            Cell current = queue.removeFirst();
+            if (current.x == exitX && current.y == exitY) {
+                return true;
+            }
+
+            if (current.x + 1 < cols
+                    && !vertical[current.y][current.x + 1]
+                    && !visited[current.y][current.x + 1]) {
+                visited[current.y][current.x + 1] = true;
+                queue.addLast(new Cell(current.x + 1, current.y));
+            }
+            if (current.x - 1 >= 0
+                    && !vertical[current.y][current.x]
+                    && !visited[current.y][current.x - 1]) {
+                visited[current.y][current.x - 1] = true;
+                queue.addLast(new Cell(current.x - 1, current.y));
+            }
+            if (current.y + 1 < rows
+                    && !horizontal[current.y + 1][current.x]
+                    && !visited[current.y + 1][current.x]) {
+                visited[current.y + 1][current.x] = true;
+                queue.addLast(new Cell(current.x, current.y + 1));
+            }
+            if (current.y - 1 >= 0
+                    && !horizontal[current.y][current.x]
+                    && !visited[current.y - 1][current.x]) {
+                visited[current.y - 1][current.x] = true;
+                queue.addLast(new Cell(current.x, current.y - 1));
+            }
+        }
+        return false;
     }
 
     private void applyLowerLeftLocalTweak(boolean[][] vertical, boolean[][] horizontal) {
@@ -443,12 +512,15 @@ public class VolumeMazeView extends View {
         }
     }
 
-    private List<Cell> findBridgePath(List<Cell> mainPath, KotlinRandom rng) {
+    private List<List<Cell>> findBridgePaths(List<Cell> mainPath, KotlinRandom rng, int targetCount) {
+        List<List<Cell>> bridges = new ArrayList<>();
         if (mainPath.size() < 14) {
-            return null;
+            return bridges;
         }
 
         Set<Cell> pathSet = new HashSet<>(mainPath);
+        Set<Cell> reservedBridgeCells = new HashSet<>();
+        List<int[]> selectedRanges = new ArrayList<>();
         List<int[]> indexPairs = new ArrayList<>();
         int minGap = Math.max(6, mainPath.size() / 4);
 
@@ -459,20 +531,50 @@ public class VolumeMazeView extends View {
         }
         shuffle(indexPairs, rng);
 
-        int maxTrials = Math.min(140, indexPairs.size());
-        for (int k = 0; k < maxTrials; k++) {
+        int maxTrials = Math.min(220, indexPairs.size());
+        for (int k = 0; k < maxTrials && bridges.size() < targetCount; k++) {
             int[] pair = indexPairs.get(k);
+            if (overlapsSelectedRange(pair, selectedRanges, minGap / 2)) {
+                continue;
+            }
             Cell start = mainPath.get(pair[0]);
             Cell end = mainPath.get(pair[1]);
-            List<Cell> bridge = randomPathAvoidingMain(start, end, pathSet, rng);
+            List<Cell> bridge = randomPathAvoidingMain(
+                    start,
+                    end,
+                    pathSet,
+                    reservedBridgeCells,
+                    rng
+            );
             if (bridge != null && bridge.size() >= 6) {
-                return bridge;
+                bridges.add(bridge);
+                selectedRanges.add(pair);
+                for (int i = 1; i < bridge.size() - 1; i++) {
+                    reservedBridgeCells.add(bridge.get(i));
+                }
             }
         }
-        return null;
+        return bridges;
     }
 
-    private List<Cell> randomPathAvoidingMain(Cell start, Cell end, Set<Cell> mainPathSet, KotlinRandom rng) {
+    private boolean overlapsSelectedRange(int[] candidate, List<int[]> selectedRanges, int margin) {
+        for (int[] selected : selectedRanges) {
+            boolean separated = candidate[1] + margin < selected[0]
+                    || selected[1] + margin < candidate[0];
+            if (!separated) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<Cell> randomPathAvoidingMain(
+            Cell start,
+            Cell end,
+            Set<Cell> mainPathSet,
+            Set<Cell> reservedBridgeCells,
+            KotlinRandom rng
+    ) {
         boolean[][] visited = new boolean[rows][cols];
         int[][] parentX = filledIntGrid(rows, cols, -1);
         int[][] parentY = filledIntGrid(rows, cols, -1);
@@ -503,6 +605,9 @@ public class VolumeMazeView extends View {
 
             for (Cell next : neighbors) {
                 if (visited[next.y][next.x]) {
+                    continue;
+                }
+                if (!next.equals(end) && reservedBridgeCells.contains(next)) {
                     continue;
                 }
                 if (!next.equals(end) && !next.equals(start) && mainPathSet.contains(next)) {

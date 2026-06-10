@@ -179,7 +179,11 @@ public class CaptchaActivity extends AppCompatActivity {
         }
         txtStatus.setText("5단계 클리어!");
         guideText.setText("클리어! 보드 복귀까지 " + remainingSeconds + "초");
-        Toast.makeText(this, "캡챠 미니게임 완료!", Toast.LENGTH_SHORT).show();
+        MiniGameClearFeedback.show(
+                this,
+                "캡챠 클리어!",
+                "5단계를 모두 통과했습니다."
+        );
     }
 
     private void returnResult(boolean success) {

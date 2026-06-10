@@ -202,7 +202,11 @@ public class VolumeMazeActivity extends AppCompatActivity implements SensorEvent
         resetButton.setEnabled(false);
         resetButton.setAlpha(0.4f);
         statusText.setText("클리어! 보드 복귀까지 " + remainingSeconds + "초");
-        Toast.makeText(this, "볼륨 미로 클리어!", Toast.LENGTH_SHORT).show();
+        MiniGameClearFeedback.show(
+                this,
+                "볼륨 미로 클리어!",
+                "목표 지점에 도착했습니다."
+        );
     }
 
     private void completeMiniGame(boolean success) {
